@@ -1,0 +1,276 @@
+{
+ "app": "livro-de-contas",
+ "format": 1,
+ "docs": {
+  "config/categories": {
+   "cats": [
+    {
+     "name": "Salário",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Sub. Alimentação",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Prendas recebidas",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Reembolsos",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Rendimentos invest.",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Outras receitas",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Subsídios",
+     "type": "Receita",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Supermercado",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Carro",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Refeições fora",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Café",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Bebidas",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Hobbies",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Férias",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Educação/Aulas",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Médico/Farmácia",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Prendas",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Livros",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Coisas Casa",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Roupa",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Desporto",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Limpeza Casa",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Outros",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Transportes",
+     "type": "Despesa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Renda",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Eletricidade",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Água/Saneamento",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "TV/Internet",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Telemóvel",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Ginásio",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Subscrições",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Desejo"
+    },
+    {
+     "name": "Seguros",
+     "type": "Conta fixa",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Poupança geral",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Fundo Emergência",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Poupança férias",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "ETFs",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "PPR",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Ações",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Cripto",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Outras poupanças",
+     "type": "Poupança",
+     "budget": 0,
+     "nature": ""
+    },
+    {
+     "name": "Cartão de crédito",
+     "type": "Dívida",
+     "budget": 0,
+     "nature": "Necessidade"
+    },
+    {
+     "name": "Empréstimo",
+     "type": "Dívida",
+     "budget": 0,
+     "nature": "Necessidade"
+    }
+   ]
+  },
+  "config/settings": {
+   "irs": 0.28,
+   "inflation": 0.02,
+   "fgd": 100000,
+   "nextContribution": 0
+  },
+  "config/accounts": {
+   "accounts": [],
+   "history": []
+  },
+  "config/etfs": {
+   "etfs": [],
+   "snaps": []
+  }
+ }
+}

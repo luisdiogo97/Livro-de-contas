@@ -1,0 +1,1023 @@
+<title>Livro de Contas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column with a bottom tab bar; wider screens get a two-column grid inside each view. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+  --ink: #121722;
+  --ink-2: #485165;
+  --muted: #778196;
+  --line: #dfe3ea;
+  --accent: #1f5fd1;
+  --accent-soft: #e3ecfb;
+  --on-accent: #ffffff;
+  --good: #16794f;
+  --good-soft: #e1f3ea;
+  --warn: #a8670b;
+  --warn-soft: #fbf0dc;
+  --bad: #c0392b;
+  --bad-soft: #fbe6e3;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --grid: #e7eaf0;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --surface: #161a21; --surface-2: #1d222b; --ink: #edf0f5; --ink-2: #b9c1ce; --muted: #8790a1;
+    --line: #29303b; --accent: #6b9af0; --accent-soft: #1c2a44; --on-accent: #0e1116;
+    --good: #4cc08a; --good-soft: #15291f; --warn: #e2a64a; --warn-soft: #2e2414; --bad: #ef7a6c; --bad-soft: #33191a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #232933; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --surface: #161a21; --surface-2: #1d222b; --ink: #edf0f5; --ink-2: #b9c1ce; --muted: #8790a1;
+  --line: #29303b; --accent: #6b9af0; --accent-soft: #1c2a44; --on-accent: #0e1116;
+  --good: #4cc08a; --good-soft: #15291f; --warn: #e2a64a; --warn-soft: #2e2414; --bad: #ef7a6c; --bad-soft: #33191a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --grid: #232933; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; -webkit-tap-highlight-color: transparent; }
+button, input, select { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px calc(96px + env(safe-area-inset-bottom, 0px)); }
+header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+header.top h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; letter-spacing: -0.01em; margin: 0; }
+header.top .sub { color: var(--muted); font-size: 0.85rem; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; margin: 0 0 10px; text-wrap: balance; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.stack { display: grid; gap: 14px; }
+.grid2 { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 820px) { .grid2 { grid-template-columns: 1fr 1fr; align-items: start; } }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+/* tab bar */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
+nav.tabs button { background: none; border: 0; padding: 9px 2px 10px; display: grid; justify-items: center; gap: 3px; color: var(--muted); font-size: 0.7rem; font-weight: 600; cursor: pointer; }
+nav.tabs button svg { width: 22px; height: 22px; }
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 10px; }
+
+/* entry */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface-2); border-radius: 11px; padding: 3px; gap: 3px; }
+.seg button { border: 0; background: none; padding: 8px 4px; border-radius: 9px; font-size: 0.85rem; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.amount { display: flex; align-items: baseline; gap: 6px; border-bottom: 2px solid var(--line); padding: 6px 2px; }
+.amount:focus-within { border-color: var(--accent); }
+.amount input { border: 0; background: none; outline: none; width: 100%; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: 2.6rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.amount span { font-family: var(--font-display); font-size: 1.8rem; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 999px; font-size: 0.88rem; cursor: pointer; color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.chip:focus-visible, .btn:focus-visible, .seg button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.field { display: grid; gap: 5px; }
+.field input, .field select, .inp { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 11px; width: 100%; min-width: 0; }
+.field input:focus, .field select:focus, .inp:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn { border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 600; cursor: pointer; background: var(--surface-2); color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--on-accent); font-size: 1.05rem; padding: 15px; width: 100%; }
+.btn.primary:disabled { opacity: .45; cursor: default; }
+.btn.danger { background: var(--bad-soft); color: var(--bad); }
+.btn.small { padding: 7px 11px; font-size: 0.85rem; border-radius: 9px; }
+.btn.ghost { background: none; color: var(--accent); padding: 6px 4px; }
+
+/* lists */
+.list { display: grid; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; width: 100%; cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.row .t { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .d { color: var(--muted); font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.row .v.in { color: var(--good); }
+.dayhead { font-size: 0.78rem; color: var(--muted); font-weight: 600; padding: 12px 2px 2px; text-transform: capitalize; }
+
+/* kpis */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 820px) { .kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } .kpis.k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-width: 0; }
+.kpi .v { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .h { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+.hero { background: var(--accent); color: var(--on-accent); border-radius: 18px; padding: 18px; display: grid; gap: 10px; }
+.hero .big { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.hero .lbl { font-size: 0.8rem; opacity: .85; font-weight: 600; }
+.hero .meter { height: 8px; border-radius: 99px; background: rgba(255,255,255,.28); overflow: hidden; }
+.hero .meter i { display: block; height: 100%; background: var(--on-accent); border-radius: 99px; }
+.hero .split { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; flex-wrap: wrap; }
+
+/* budget bars */
+.bud { display: grid; gap: 4px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.bud:last-child { border-bottom: 0; }
+.bud .top { display: flex; justify-content: space-between; gap: 10px; font-size: 0.9rem; }
+.bud .top b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 99px; background: var(--s1); }
+.track i.warn { background: var(--warn); }
+.track i.bad { background: var(--bad); }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.neutral { background: var(--surface-2); color: var(--ink-2); }
+
+/* tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+td.r, th.r { text-align: right; }
+td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3px; }
+
+/* charts */
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 16px; font-family: var(--font-body); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: var(--ink-2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+#tip[hidden], #toast[hidden] { display: none; }
+#tip { position: fixed; z-index: 50; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 0.8rem; padding: 7px 10px; border-radius: 9px; max-width: 240px; white-space: pre-line; box-shadow: 0 4px 14px rgba(0,0,0,.2); font-variant-numeric: tabular-nums; }
+
+.monthnav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.monthnav b { font-family: var(--font-display); font-size: 1.15rem; text-transform: capitalize; }
+.iconbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; width: 38px; height: 38px; display: grid; place-items: center; cursor: pointer; }
+.iconbtn:disabled { opacity: .35; cursor: default; }
+
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 40; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; font-size: 0.9rem; max-width: calc(100% - 32px); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+#toast button { background: none; border: 0; color: var(--bg); font-weight: 700; text-decoration: underline; cursor: pointer; padding: 4px; }
+.banner { background: var(--warn-soft); color: var(--warn); border-radius: 12px; padding: 10px 14px; font-size: 0.88rem; margin-bottom: 12px; }
+.empty { color: var(--muted); font-size: 0.9rem; padding: 10px 0; }
+.acc { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.acc:last-child { border-bottom: 0; }
+.acc .head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.acc .head b { font-size: 1rem; }
+.acc .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.84rem; color: var(--ink-2); }
+.edit { display: grid; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 12px; }
+.catrow { display: grid; grid-template-columns: 1fr 96px 120px 34px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.catrow.nonat { grid-template-columns: 1fr 96px 34px; }
+@media (max-width: 420px) { .catrow { grid-template-columns: 1fr 84px 34px; } .catrow .nat { grid-column: 1 / -1; } }
+.x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; }
+.x:hover { background: var(--surface-2); }
+@media (prefers-reduced-motion: no-preference) { .chip, .btn, .seg button { transition: background-color .15s, color .15s; } }
+</style>
+
+<div class="wrap" id="app" aria-live="polite">
+  <header class="top"><h1>Livro de Contas</h1><span class="sub">A carregar os seus dados…</span></header>
+  <div class="card"><p class="empty">Os seus movimentos, orçamentos, contas e ETFs aparecem aqui assim que a ligação aos dados estiver pronta.</p></div>
+</div>
+<nav class="tabs" aria-label="Secções"><div class="in" id="tabs"></div></nav>
+<div id="tip" hidden></div>
+<div id="toast" hidden></div>
+
+<script>
+(() => {
+'use strict';
+// ---------- formatting ----------
+const fEur = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
+const fEur0 = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const fPct = new Intl.NumberFormat('pt-PT', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fPct2 = new Intl.NumberFormat('pt-PT', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eur = v => fEur.format(v || 0), eur0 = v => fEur0.format(Math.round(v || 0)), pct = v => (isFinite(v) ? fPct.format(v) : '–'), pct2 = v => (isFinite(v) ? fPct2.format(v) : '–');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const isoOf = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+const today = () => isoOf(new Date());
+const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const monthKey = s => s.slice(0, 7);
+const addMonths = (key, n) => { const [y, m] = key.split('-').map(Number); const dt = new Date(y, m - 1 + n, 1); return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}`; };
+const monthLong = key => new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' }).format(parseD(key + '-01'));
+const monthShort = key => new Intl.DateTimeFormat('pt-PT', { month: 'short' }).format(parseD(key + '-01')).replace('.', '') + ' ' + key.slice(2, 4);
+const dayLong = s => new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(parseD(s));
+const dayShort = s => new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' }).format(parseD(s)).replace('.', '');
+const daysInMonth = key => { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0).getDate(); };
+const parseAmount = s => { s = String(s || '').trim().replace(/\s|€/g, ''); if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); const v = parseFloat(s); return isFinite(v) ? Math.round(v * 100) / 100 : NaN; };
+const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+const TYPES = ['Despesa', 'Conta fixa', 'Receita', 'Poupança', 'Dívida'];
+const SPEND = ['Despesa', 'Conta fixa', 'Dívida'];
+const CAPN = { 'Diária': 365, 'Mensal': 12, 'Trimestral': 4, 'Semestral': 2, 'Anual': 1, 'Nenhuma': 1 };
+const WEEK = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+// ---------- state ----------
+const S = { months: {}, cats: [], settings: { irs: 0.28, inflation: 0.02, fgd: 100000, nextContribution: 200 }, accounts: { accounts: [], history: [] }, etfs: { etfs: [], snaps: [] }, loaded: { tx: false, categories: false }, dbState: 'pending' };
+let view = 'registar';
+let curMonth = monthKey(today());
+let yearSel = 'last12';
+const F = { type: 'Despesa', amount: '', cat: '', date: today(), note: '', editing: null, confirmDel: false };
+const UI = { openAcc: null, confirmAcc: null, showAllRecent: false, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
+let db = null, host = { kind: 'none', saveFile: null };
+const offMsg = () => host.kind === 'app' ? 'Não foi possível abrir os dados guardados neste telemóvel. Feche e volte a abrir a app.' : 'Sem ligação aos dados guardados. Abra esta página com a sua conta claude.ai para ver e registar movimentos.';
+
+const catType = name => (S.cats.find(c => c.name === name) || {}).type || 'Despesa';
+const allTx = () => Object.values(S.months).flat();
+function monthTx(key) { return (S.months[key] || []).slice().sort((a, b) => a.d.localeCompare(b.d)); }
+function totalsOf(items) {
+  const t = { Receita: 0, Despesa: 0, 'Conta fixa': 0, Poupança: 0, Dívida: 0 };
+  for (const x of items) t[catType(x.c)] = (t[catType(x.c)] || 0) + x.v;
+  t.gastos = t.Despesa + t['Conta fixa'] + t.Dívida;
+  t.poupado = t.Receita - t.gastos;
+  t.taxa = t.Receita > 0 ? t.poupado / t.Receita : NaN;
+  return t;
+}
+const budgetOf = type => S.cats.filter(c => c.type === type).reduce((s, c) => s + (+c.budget || 0), 0);
+
+// ---------- persistence ----------
+const queues = {};
+function writeDoc(path, data) {
+  if (!db) { toast('Sem ligação aos dados: a alteração não foi guardada.'); return Promise.reject(); }
+  const prev = queues[path] || Promise.resolve();
+  const p = prev.catch(() => {}).then(() => db.doc(path).set(data));
+  queues[path] = p;
+  p.catch(e => toast(e && e.code === 'quota_exceeded' ? 'Espaço de dados cheio: não foi possível guardar.' : 'Não foi possível guardar. Tente outra vez.'));
+  return p;
+}
+const saveMonth = key => writeDoc('tx/' + key, { items: S.months[key] || [] });
+const saveCats = () => writeDoc('config/categories', { cats: S.cats });
+const saveSettings = () => writeDoc('config/settings', S.settings);
+const saveAccounts = () => writeDoc('config/accounts', S.accounts);
+const saveEtfs = () => writeDoc('config/etfs', S.etfs);
+
+function addTx(item) {
+  const key = monthKey(item.d);
+  S.months[key] = [...(S.months[key] || []), item];
+  render();
+  return saveMonth(key);
+}
+function removeTx(id) {
+  for (const key of Object.keys(S.months)) {
+    const arr = S.months[key];
+    if (arr.some(x => x.id === id)) { S.months[key] = arr.filter(x => x.id !== id); render(); return saveMonth(key); }
+  }
+}
+function findTx(id) { for (const arr of Object.values(S.months)) { const t = arr.find(x => x.id === id); if (t) return t; } return null; }
+
+// ---------- toast & tooltip ----------
+let toastTimer;
+function toast(msg, action) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (action ? `<button type="button" id="toast-act">${esc(action.label)}</button>` : '');
+  el.hidden = false;
+  if (action) document.getElementById('toast-act').onclick = () => { el.hidden = true; action.fn(); };
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, action ? 6000 : 3500);
+}
+const tip = document.getElementById('tip');
+function showTip(e) {
+  const t = e.target.closest('[data-tip]'); if (!t) { tip.hidden = true; return; }
+  tip.textContent = t.getAttribute('data-tip'); tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 12, y = e.clientY - r.height - 12;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 12;
+  if (y < 8) y = e.clientY + 16;
+  tip.style.left = Math.max(8, x) + 'px'; tip.style.top = y + 'px';
+}
+document.addEventListener('pointermove', showTip);
+document.addEventListener('pointerdown', showTip);
+document.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
+
+// ---------- charts (hand-drawn SVG, theme tokens) ----------
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+function axisFmt(v) { return Math.abs(v) >= 1000 ? (v / 1000).toLocaleString('pt-PT', { maximumFractionDigits: 1 }) + ' mil' : Math.round(v).toLocaleString('pt-PT'); }
+function barChart({ labels, series, tips, h = 210, minY = 0 }) {
+  const W = 600, H = h, L = 58, R = 6, T = 10, B = 30, pw = W - L - R, ph = H - T - B;
+  const allV = series.flatMap(s => s.values);
+  const maxV = niceMax(Math.max(...allV, 100)), minV = Math.min(0, minY, ...allV) < 0 ? -niceMax(-Math.min(...allV)) : 0;
+  const y = v => T + ph * (maxV - v) / (maxV - minV);
+  let g = '';
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) { const v = minV + (maxV - minV) * i / ticks; const yy = y(v); g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 6}" y="${yy + 4}" text-anchor="end">${axisFmt(v)}</text>`; }
+  const n = labels.length, gw = pw / n, k = series.length;
+  const bw = Math.min(26, (gw * 0.72 - (k - 1) * 2) / k);
+  const every = n > 16 ? Math.ceil(n / 10) : 1;
+  labels.forEach((lab, i) => {
+    const gx = L + gw * i + (gw - (bw * k + (k - 1) * 2)) / 2;
+    series.forEach((s, j) => {
+      const v = s.values[i] || 0; if (!v) return;
+      const x = gx + j * (bw + 2), y0 = y(0), y1 = y(v), top = Math.min(y0, y1), hh = Math.abs(y0 - y1), r = Math.min(4, bw / 2, hh);
+      const path = v >= 0
+        ? `M${x},${y0} V${top + r} Q${x},${top} ${x + r},${top} H${x + bw - r} Q${x + bw},${top} ${x + bw},${top + r} V${y0} Z`
+        : `M${x},${y0} V${top + hh - r} Q${x},${top + hh} ${x + r},${top + hh} H${x + bw - r} Q${x + bw},${top + hh} ${x + bw},${top + hh - r} V${y0} Z`;
+      g += `<path d="${path}" fill="${s.color}"/>`;
+    });
+    if (i % every === 0) g += `<text x="${L + gw * i + gw / 2}" y="${H - 8}" text-anchor="middle">${esc(lab)}</text>`;
+    g += `<rect x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}" fill="transparent" data-tip="${esc(tips[i])}"/>`;
+  });
+  if (minV < 0) g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+function lineChart({ labels, series, tips, h = 200 }) {
+  const W = 600, H = h, L = 62, R = 10, T = 12, B = 26, pw = W - L - R, ph = H - T - B;
+  const all = series.flatMap(s => s.values);
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const maxV = niceMax(Math.max(hi, 100)), minV = lo < 0 ? -niceMax(-lo) : (lo > maxV * 0.5 ? Math.floor(lo / (maxV / 10)) * (maxV / 10) : 0);
+  const n = labels.length, x = i => L + (n === 1 ? pw / 2 : pw * i / (n - 1)), y = v => T + ph * (maxV - v) / (maxV - minV || 1);
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const v = minV + (maxV - minV) * i / 4; g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${axisFmt(v)}</text>`; }
+  if (minV < 0) g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)"/>`;
+  series.forEach((s, j) => {
+    const pts = s.values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+    if (j === 0 && s.area) g += `<path d="M${x(0)},${y(Math.max(minV, 0))} L${pts.join(' L')} L${x(n - 1)},${y(Math.max(minV, 0))} Z" fill="${s.color}" opacity="0.12"/>`;
+    g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const li = n - 1; g += `<circle cx="${x(li)}" cy="${y(s.values[li])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
+  });
+  const every = n > 12 ? Math.ceil(n / 8) : 1;
+  labels.forEach((lab, i) => { if (i % every === 0 || i === n - 1) g += `<text x="${x(i)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${esc(lab)}</text>`; });
+  const hw = n > 1 ? pw / (n - 1) : pw;
+  labels.forEach((lab, i) => { g += `<rect x="${x(i) - hw / 2}" y="${T}" width="${hw}" height="${ph}" fill="transparent" data-tip="${esc(tips[i])}"/>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+const legend = items => `<div class="legend">${items.map(([n, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join('')}</div>`;
+
+// ---------- views ----------
+function viewRegistar() {
+  const key = monthKey(today());
+  const t = totalsOf(S.months[key] || []);
+  const budVar = budgetOf('Despesa'), budAll = budVar + budgetOf('Conta fixa');
+  const dDone = new Date().getDate(), dTot = daysInMonth(key);
+  const usedPct = budAll > 0 ? Math.min(1, (t.Despesa + t['Conta fixa']) / budAll) : 0;
+  const cats = S.cats.filter(c => c.type === F.type);
+  // most used first (last 120 days)
+  const since = isoOf(new Date(Date.now() - 120 * 864e5));
+  const freq = {}; for (const x of allTx()) if (x.d >= since) freq[x.c] = (freq[x.c] || 0) + 1;
+  cats.sort((a, b) => (freq[b.name] || 0) - (freq[a.name] || 0));
+  const amt = parseAmount(F.amount);
+  const canSave = amt > 0 && F.cat && F.date;
+  const yest = isoOf(new Date(Date.now() - 864e5));
+  const recent = allTx().slice().sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id)).slice(0, UI.showAllRecent ? 30 : 8);
+  const typesShown = TYPES.filter(tp => tp !== 'Dívida' || S.cats.some(c => c.type === 'Dívida' && freq[c.name]));
+  return `
+  <header class="top"><h1>${F.editing ? 'Editar movimento' : 'Registar'}</h1><span class="sub">${esc(dayLong(today()))}</span></header>
+  ${!allTx().length ? welcomeCard() : ''}
+  ${host.kind === 'app' && allTx().length && (!S.settings.lastBackup || (parseD(today()) - parseD(S.settings.lastBackup)) / 864e5 > 30) ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${S.settings.lastBackup ? 'Já passou mais de um mês desde a última cópia de segurança.' : 'Ainda não fez nenhuma cópia de segurança dos seus dados.'}</span><button class="btn small" data-act="backup">Fazer agora</button></div>` : ''}
+  <div class="grid2">
+  <div class="stack">
+    <form class="card stack" id="entry" autocomplete="off">
+      <div class="seg" role="group" aria-label="Tipo">${typesShown.map(tp => `<button type="button" data-act="type" data-v="${tp}" aria-pressed="${F.type === tp}">${tp === 'Conta fixa' ? 'Fixa' : tp}</button>`).join('')}</div>
+      <label class="amount"><input id="f-amount" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" aria-label="Valor em euros"><span>€</span></label>
+      <div class="field"><span class="label">Categoria</span>
+        <div class="chips">${cats.map(c => `<button type="button" class="chip" data-act="cat" data-v="${esc(c.name)}" aria-pressed="${F.cat === c.name}">${esc(c.name)}</button>`).join('') || '<span class="empty">Sem categorias deste tipo. Crie-as em Ajustes.</span>'}</div>
+      </div>
+      <div class="field"><span class="label">Data</span>
+        <div class="chips">
+          <button type="button" class="chip" data-act="date" data-v="${today()}" aria-pressed="${F.date === today()}">Hoje</button>
+          <button type="button" class="chip" data-act="date" data-v="${yest}" aria-pressed="${F.date === yest}">Ontem</button>
+          <input type="date" id="f-date" class="inp" style="width:auto;flex:1;min-width:140px" value="${esc(F.date)}" aria-label="Outra data">
+        </div>
+      </div>
+      <div class="field"><label class="label" for="f-note">Nota (opcional)</label><input id="f-note" placeholder="ex.: jantar com amigos" value="${esc(F.note)}"></div>
+      <button class="btn primary" type="submit" ${canSave ? '' : 'disabled'}>${F.editing ? 'Guardar alterações' : (canSave ? `Guardar ${eur(amt)}` : 'Guardar')}</button>
+      ${F.editing ? `<div class="row2"><button type="button" class="btn" data-act="cancel-edit">Cancelar</button><button type="button" class="btn danger" data-act="del-edit">${F.confirmDel ? 'Confirmar apagar' : 'Apagar'}</button></div>` : ''}
+    </form>
+  </div>
+  <div class="stack">
+    <section class="hero" aria-label="Este mês">
+      <div class="lbl">Gasto em ${esc(monthLong(key))}</div>
+      <div class="big">${eur(t.Despesa + t['Conta fixa'])}</div>
+      <div class="meter" aria-hidden="true"><i style="width:${(usedPct * 100).toFixed(1)}%"></i></div>
+      <div class="split"><span>Orçamento ${eur0(budAll)}</span><span>${budVar - t.Despesa >= 0 ? 'Restam ' + eur(budVar - t.Despesa) + ' em variáveis' : 'Variáveis acima em ' + eur(t.Despesa - budVar)}</span></div>
+      <div class="split"><span>Média diária ${eur((t.Despesa + t['Conta fixa']) / dDone)}</span><span>Dia ${dDone} de ${dTot}</span></div>
+    </section>
+    <section class="card">
+      <h2>Últimos movimentos</h2>
+      <div class="list">${recent.map(x => rowTx(x)).join('') || '<p class="empty">Ainda sem movimentos.</p>'}</div>
+      <button class="btn ghost small" data-act="more-recent">${UI.showAllRecent ? 'Mostrar menos' : 'Mostrar mais'}</button>
+    </section>
+  </div></div>`;
+}
+function rowTx(x, showDate = true) {
+  const tp = catType(x.c), inflow = tp === 'Receita';
+  return `<button class="row" data-act="edit" data-id="${esc(x.id)}" aria-label="Editar ${esc(x.c)} ${eur(x.v)}">
+    <span class="t">${esc(x.c)}</span><span class="v ${inflow ? 'in' : ''}">${inflow ? '+' : '−'}${eur(x.v)}</span>
+    <span class="d">${showDate ? esc(dayShort(x.d)) + ' · ' : ''}${esc(tp)}${x.n ? ' · ' + esc(x.n) : ''}</span><span></span></button>`;
+}
+
+function viewMes() {
+  const key = curMonth, items = monthTx(key), t = totalsOf(items);
+  const isCur = key === monthKey(today()), dTot = daysInMonth(key);
+  const dDone = isCur ? new Date().getDate() : (key < monthKey(today()) ? dTot : 0);
+  const keys = Object.keys(S.months).sort();
+  const first = keys[0] || key;
+  // daily spend
+  const daily = Array.from({ length: dTot }, () => 0);
+  for (const x of items) if (catType(x.c) === 'Despesa') daily[+x.d.slice(8) - 1] += x.v;
+  const budRows = type => {
+    const spent = {}; for (const x of items) if (catType(x.c) === type) spent[x.c] = (spent[x.c] || 0) + x.v;
+    const rows = S.cats.filter(c => c.type === type && ((+c.budget || 0) > 0 || spent[c.name]))
+      .map(c => ({ name: c.name, b: +c.budget || 0, s: spent[c.name] || 0 }))
+      .sort((a, b) => (b.b ? b.s / b.b : 9) - (a.b ? a.s / a.b : 9) || b.s - a.s);
+    return rows.map(r => {
+      const p = r.b ? r.s / r.b : (r.s ? 2 : 0);
+      const cls = !r.b ? 'bad' : p > 1 ? 'bad' : p >= 0.8 ? 'warn' : '';
+      const pill = !r.b ? '<span class="pill neutral">sem orçamento</span>' : p > 1 ? `<span class="pill bad">▲ ${eur0(r.s - r.b)} acima</span>` : p >= 0.8 ? `<span class="pill warn">${pct(p)}</span>` : '';
+      return `<div class="bud"><div class="top"><b>${esc(r.name)}</b><span class="num">${eur(r.s)}<span class="muted"> / ${eur0(r.b)}</span></span></div>
+        <div class="track"><i class="${cls}" style="width:${Math.min(100, p * 100).toFixed(1)}%"></i></div>${pill ? `<div>${pill}</div>` : ''}</div>`;
+    }).join('') || '<p class="empty">Sem gastos nem orçamento neste mês.</p>';
+  };
+  const proj = dDone > 0 && isCur ? (t.Despesa + t['Conta fixa']) / dDone * dTot : null;
+  const budAll = budgetOf('Despesa') + budgetOf('Conta fixa');
+  const spentBy = {}; for (const x of items) if (SPEND.includes(catType(x.c))) spentBy[x.c] = (spentBy[x.c] || 0) + x.v;
+  const spendRank = Object.entries(spentBy).sort((a, b) => b[1] - a[1]);
+  const topSpend = spendRank[0] ? spendRank[0][1] : 1;
+  const byDay = {}; for (const x of items.slice().reverse()) (byDay[x.d] = byDay[x.d] || []).push(x);
+  const days = Object.keys(byDay).sort().reverse();
+  return `
+  <header class="top"><h1>Mês</h1></header>
+  <div class="stack">
+    <div class="monthnav"><button class="iconbtn" data-act="prev-m" aria-label="Mês anterior" ${key <= first ? 'disabled' : ''}>‹</button><b>${esc(monthLong(key))}</b><button class="iconbtn" data-act="next-m" aria-label="Mês seguinte" ${key >= monthKey(today()) ? 'disabled' : ''}>›</button></div>
+    <div class="kpis k4">
+      <div class="kpi"><div class="label">Receitas</div><div class="v">${eur(t.Receita)}</div></div>
+      <div class="kpi"><div class="label">Gastos</div><div class="v">${eur(t.gastos)}</div><div class="h">${eur0(t.Despesa)} variáveis · ${eur0(t['Conta fixa'])} fixas</div></div>
+      <div class="kpi"><div class="label">Sobrou</div><div class="v" style="color:${t.poupado < 0 ? 'var(--bad)' : 'inherit'}">${eur(t.poupado)}</div>${t.Poupança ? `<div class="h">${eur0(t.Poupança)} posto de lado</div>` : ''}</div>
+      <div class="kpi"><div class="label">Taxa de poupança</div><div class="v">${pct(t.taxa)}</div>${proj != null ? `<div class="h">Projeção de gastos: ${eur0(proj)} ${proj > budAll ? '<span class="pill warn">acima do orç.</span>' : '<span class="pill good">dentro do orç.</span>'}</div>` : ''}</div>
+    </div>
+    <section class="card"><h2>Gastos por categoria</h2><div class="tbl-wrap"><table>
+      <thead><tr><th>Categoria</th><th class="r">Valor</th><th class="r">% dos gastos</th></tr></thead>
+      <tbody>${spendRank.map(([c, v]) => `<tr><td>${esc(c)}${catType(c) === 'Despesa' ? '' : ` <span class="muted small">${esc(catType(c).toLowerCase())}</span>`}<div class="bar" style="width:${(v / topSpend * 100).toFixed(1)}%"></div></td><td class="r">${eur(v)}</td><td class="r">${pct(t.gastos ? v / t.gastos : NaN)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Sem gastos neste mês.</td></tr>'}</tbody>
+      ${spendRank.length ? `<tfoot><tr><td><b>Total</b></td><td class="r"><b>${eur(t.gastos)}</b></td><td class="r"><b>100%</b></td></tr></tfoot>` : ''}
+    </table></div></section>
+    <div class="grid2">
+      <section class="card"><h2>Orçamento: despesas variáveis</h2>${budRows('Despesa')}</section>
+      <section class="card"><h2>Orçamento: contas fixas</h2>${budRows('Conta fixa')}</section>
+    </div>
+    <section class="card chart"><h2>Despesas variáveis por dia</h2>
+      ${barChart({ labels: daily.map((_, i) => String(i + 1)), series: [{ color: 'var(--s1)', values: daily }], tips: daily.map((v, i) => `${i + 1} ${monthShort(key).split(' ')[0]}: ${eur(v)}`), h: 170 })}</section>
+    <section class="card"><h2>Movimentos (${items.length})</h2>
+      ${days.map(d => `<div class="dayhead">${esc(dayLong(d))}</div>${byDay[d].map(x => rowTx(x, false)).join('')}`).join('') || '<p class="empty">Sem movimentos neste mês.</p>'}</section>
+  </div>`;
+}
+
+function yearWindow() {
+  if (yearSel === 'last12') { const end = monthKey(today()); return Array.from({ length: 12 }, (_, i) => addMonths(end, i - 11)); }
+  return Array.from({ length: 12 }, (_, i) => `${yearSel}-${pad(i + 1)}`);
+}
+function viewAno() {
+  const win = yearWindow();
+  const per = win.map(k => totalsOf(S.months[k] || []));
+  const withData = win.filter(k => (S.months[k] || []).length).length || 1;
+  const tot = totalsOf(win.flatMap(k => S.months[k] || []));
+  const years = [...new Set(Object.keys(S.months).map(k => k.slice(0, 4)))].sort().reverse();
+  const items = win.flatMap(k => S.months[k] || []);
+  // categories
+  const byCat = {}; for (const x of items) byCat[x.c] = (byCat[x.c] || 0) + x.v;
+  const spendCats = Object.entries(byCat).filter(([c]) => SPEND.includes(catType(c))).sort((a, b) => b[1] - a[1]);
+  const incCats = Object.entries(byCat).filter(([c]) => catType(c) === 'Receita').sort((a, b) => b[1] - a[1]);
+  const maxCat = spendCats[0] ? spendCats[0][1] : 1;
+  // 50/30/20
+  let need = 0, want = 0; for (const x of items) { if (!SPEND.includes(catType(x.c))) continue; const n = (S.cats.find(c => c.name === x.c) || {}).nature; if (n === 'Desejo') want += x.v; else need += x.v; }
+  const rule = [['Necessidades', need, 0.5], ['Desejos', want, 0.3], ['Poupança', tot.Receita - need - want, 0.2]];
+  // weekday
+  const wd = Array(7).fill(0), wn = Array(7).fill(0);
+  for (const x of items) if (catType(x.c) === 'Despesa') { const i = (parseD(x.d).getDay() + 6) % 7; wd[i] += x.v; wn[i]++; }
+  let acc = 0; const cum = per.map(p => (acc += p.poupado));
+  const active = win.filter(k => (S.months[k] || []).length);
+  const ranked = active.map(k => [k, totalsOf(S.months[k]).gastos]).sort((a, b) => b[1] - a[1]);
+  const big = items.filter(x => catType(x.c) === 'Despesa').sort((a, b) => b.v - a.v)[0];
+  const chips = `<div class="chips" role="group" aria-label="Período">
+      <button class="chip" data-act="year" data-v="last12" aria-pressed="${yearSel === 'last12'}">Últimos 12 meses</button>
+      ${years.map(y => `<button class="chip" data-act="year" data-v="${y}" aria-pressed="${yearSel === y}">${y}</button>`).join('')}
+    </div>`;
+  if (!items.length) return `<header class="top"><h1>Ano</h1></header><div class="stack">${chips}<section class="card"><p class="empty">Ainda não há movimentos neste período. Os totais, as médias mensais e os gráficos aparecem aqui assim que registar despesas e receitas.</p></section></div>`;
+  return `
+  <header class="top"><h1>Ano</h1></header>
+  <div class="stack">
+    ${chips}
+    <div class="kpis k3">
+      <div class="kpi"><div class="label">Receitas</div><div class="v">${eur0(tot.Receita)}</div><div class="h">${eur0(tot.Receita / withData)} por mês</div></div>
+      <div class="kpi"><div class="label">Gastos</div><div class="v">${eur0(tot.gastos)}</div><div class="h">${eur0(tot.gastos / withData)} por mês</div></div>
+      <div class="kpi"><div class="label">Sobrou</div><div class="v" style="color:${tot.poupado < 0 ? 'var(--bad)' : 'inherit'}">${eur0(tot.poupado)}</div><div class="h">Taxa de poupança ${pct(tot.taxa)}</div></div>
+      <div class="kpi"><div class="label">Despesas variáveis</div><div class="v">${eur0(tot.Despesa)}</div><div class="h">${eur0(tot.Despesa / withData)} por mês</div></div>
+      <div class="kpi"><div class="label">Contas fixas</div><div class="v">${eur0(tot['Conta fixa'])}</div><div class="h">${pct(tot.gastos ? tot['Conta fixa'] / tot.gastos : NaN)} dos gastos</div></div>
+      <div class="kpi"><div class="label">Mês mais caro</div><div class="v" style="text-transform:capitalize">${ranked[0] ? esc(monthShort(ranked[0][0])) : '–'}</div><div class="h">${ranked[0] ? eur0(ranked[0][1]) + ' · mais barato: ' + esc(monthShort(ranked[ranked.length - 1][0])) + ' (' + eur0(ranked[ranked.length - 1][1]) + ')' : ''}</div></div>
+    </div>
+    <section class="card chart"><h2>Receitas e gastos por mês</h2>
+      ${legend([['Receitas', 'var(--s1)'], ['Gastos', 'var(--s2)']])}
+      ${barChart({ labels: win.map(k => monthShort(k).split(' ')[0]), series: [{ color: 'var(--s1)', values: per.map(p => p.Receita) }, { color: 'var(--s2)', values: per.map(p => p.gastos) }], tips: win.map((k, i) => `${monthShort(k)}\nReceitas: ${eur(per[i].Receita)}\nGastos: ${eur(per[i].gastos)}\nSobrou: ${eur(per[i].poupado)}`) })}
+    </section>
+    <div class="grid2">
+      <section class="card chart"><h2>Saldo acumulado</h2><p class="small muted" style="margin:-4px 0 8px">Receitas menos gastos, somados mês a mês.</p>
+        ${lineChart({ labels: win.map(k => monthShort(k).split(' ')[0]), series: [{ color: 'var(--s1)', values: cum, area: true }], tips: win.map((k, i) => `${monthShort(k)}: ${eur(cum[i])}`) })}</section>
+      <section class="card"><h2>Regra 50/30/20</h2>
+        ${rule.map(([n, v, ref]) => { const p = tot.Receita ? v / tot.Receita : 0; const ok = n === 'Poupança' ? p >= ref : p <= ref; return `<div class="bud"><div class="top"><b>${n}</b><span class="num">${eur0(v)} · <b>${pct(p)}</b> <span class="muted">(ref. ${pct(ref).replace(',0', '')})</span></span></div><div class="track"><i class="${ok ? '' : 'bad'}" style="width:${Math.max(0, Math.min(100, p * 100)).toFixed(1)}%"></i></div><div><span class="pill ${ok ? 'good' : 'bad'}">${ok ? '✓ dentro da referência' : '✕ fora da referência'}</span></div></div>`; }).join('')}
+        <p class="small muted">Necessidade ou desejo é definido por categoria em Ajustes.</p></section>
+    </div>
+    <div class="grid2">
+      <section class="card"><h2>Gastos por categoria</h2><div class="tbl-wrap"><table>
+        <thead><tr><th>Categoria</th><th class="r">Total</th><th class="r">Média/mês</th><th class="r">%</th></tr></thead>
+        <tbody>${spendCats.map(([c, v]) => `<tr><td>${esc(c)}<div class="bar" style="width:${(v / maxCat * 100).toFixed(1)}%"></div></td><td class="r">${eur0(v)}</td><td class="r">${eur0(v / withData)}</td><td class="r">${pct(v / tot.gastos)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Sem gastos no período.</td></tr>'}</tbody></table></div></section>
+      <div class="stack">
+        <section class="card chart"><h2>Despesas variáveis por dia da semana</h2>
+          ${barChart({ labels: WEEK, series: [{ color: 'var(--s1)', values: wd }], tips: WEEK.map((w, i) => `${w}: ${eur(wd[i])} em ${wn[i]} movimentos\nMédia: ${eur(wn[i] ? wd[i] / wn[i] : 0)}`), h: 170 })}</section>
+        <section class="card"><h2>Receitas por origem</h2><div class="tbl-wrap"><table><tbody>${incCats.map(([c, v]) => `<tr><td>${esc(c)}</td><td class="r">${eur0(v)}</td><td class="r muted">${eur0(v / withData)}/mês</td></tr>`).join('') || '<tr><td class="muted">Sem receitas no período.</td></tr>'}</tbody></table></div>
+          ${big ? `<p class="small muted" style="margin-top:12px">Maior despesa: <b>${eur(big.v)}</b> em ${esc(big.c)}, ${esc(dayShort(big.d))}${big.n ? ' (' + esc(big.n) + ')' : ''}.</p>` : ''}</section>
+      </div>
+    </div>
+  </div>`;
+}
+
+function accCalc(a) {
+  const n = CAPN[a.cap] || 1, tanl = (+a.tanb || 0) * (a.irs ? 1 - S.settings.irs : 1);
+  const eff = a.cap === 'Nenhuma' ? tanl : Math.pow(1 + tanl / n, n) - 1;
+  const year = (+a.balance || 0) * eff;
+  return { tanl, eff, year, month: year / 12, real: (1 + eff) / (1 + S.settings.inflation) - 1 };
+}
+function etfCalc() {
+  const snaps = S.etfs.snaps || [];
+  const rows = (S.etfs.etfs || []).map(e => {
+    const mine = snaps.filter(s => s.e === e.key).sort((a, b) => a.d.localeCompare(b.d));
+    const inv = mine.reduce((s, x) => s + (+x.inv || 0), 0);
+    const last = mine[mine.length - 1];
+    const val = last ? +last.val : 0;
+    const gain = val - inv, g = inv ? gain / inv : NaN;
+    let yrs = 0; if (last && inv) yrs = mine.reduce((s, x) => s + (+x.inv || 0) * (parseD(last.d) - parseD(x.d)) / 864e5, 0) / inv / 365;
+    const ann = yrs > 0.08 ? Math.pow(1 + g, 1 / yrs) - 1 : NaN;
+    return { ...e, inv, val, gain, g, ann, lastD: last ? last.d : null };
+  });
+  const totV = rows.reduce((s, r) => s + r.val, 0), totI = rows.reduce((s, r) => s + r.inv, 0);
+  const next = +S.settings.nextContribution || 0;
+  const need = rows.map(r => Math.max(0, (r.target || 0) * (totV + next) - r.val)), needSum = need.reduce((a, b) => a + b, 0);
+  rows.forEach((r, i) => { r.w = totV ? r.val / totV : 0; r.sug = needSum ? next * need[i] / needSum : 0; });
+  // evolution: per unique date, sum of last known values / cumulative invested
+  const dates = [...new Set(snaps.map(s => s.d))].sort();
+  const evo = dates.map(d => {
+    let v = 0, iv = 0;
+    for (const e of rows) { const m = snaps.filter(s => s.e === e.key && s.d <= d); if (m.length) { v += +m.sort((a, b) => a.d.localeCompare(b.d))[m.length - 1].val; iv += m.reduce((s, x) => s + (+x.inv || 0), 0); } }
+    return { d, v, iv };
+  });
+  return { rows, totV, totI, evo };
+}
+function viewPatrimonio() {
+  const accs = S.accounts.accounts || [];
+  const calc = accs.map(accCalc);
+  const totA = accs.reduce((s, a) => s + (+a.balance || 0), 0);
+  const juroAno = calc.reduce((s, c) => s + c.year, 0);
+  const effAvg = totA ? juroAno / totA : 0;
+  const best = Math.max(0, ...calc.map(c => c.eff));
+  const lost = totA * best - juroAno;
+  const E = etfCalc();
+  const net = totA + E.totV;
+  const keys = Object.keys(S.months).sort().slice(-12);
+  const gastoMed = keys.length ? keys.reduce((s, k) => s + totalsOf(S.months[k]).gastos, 0) / keys.length : 0;
+  const inflation = S.settings.inflation;
+  const byBank = {}; accs.forEach(a => { byBank[a.bank] = (byBank[a.bank] || 0) + (+a.balance || 0); });
+  const accRow = (a, i) => {
+    const c = calc[i], open = UI.openAcc === a.id;
+    const realPill = (+a.tanb || 0) === 0 ? '<span class="pill neutral">sem juros</span>' : c.real < 0 ? `<span class="pill warn">▼ ${pct2(c.real)} real</span>` : `<span class="pill good">▲ ${pct2(c.real)} real</span>`;
+    const fgd = byBank[a.bank] > S.settings.fgd ? '<span class="pill bad">acima do limite do Fundo de Garantia</span>' : '';
+    return `<div class="acc"><div class="head"><b>${esc(a.bank)}</b><span class="num" style="font-weight:700">${eur(a.balance)}</span></div>
+      <div class="meta"><span>${esc(a.product)}</span><span>TANB ${pct2(+a.tanb || 0)}</span><span>Líquida ${pct2(c.eff)}</span><span>${eur(c.month)}/mês</span><span>${eur0(c.year)}/ano</span>${realPill}${fgd}</div>
+      ${open ? accEdit(a) : `<div><button class="btn ghost small" data-act="acc-open" data-id="${esc(a.id)}">Atualizar saldo ou taxa</button></div>`}</div>`;
+  };
+  const hist = (S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d));
+  return `
+  <header class="top"><h1>Património</h1></header>
+  <div class="stack">
+    <section class="hero"><div class="lbl">Património total</div><div class="big">${eur(net)}</div>
+      <div class="split"><span>Contas ${eur0(totA)}</span><span>ETFs ${eur0(E.totV)}</span><span>${gastoMed ? (net / gastoMed).toLocaleString('pt-PT', { maximumFractionDigits: 1 }) + ' meses de gastos' : ''}</span></div></section>
+    <div class="grid2">
+      <section class="card"><h2>Contas e poupanças</h2>
+        ${accs.length ? `<div class="kpis" style="margin-bottom:6px">
+          <div class="kpi"><div class="label">Juros líquidos</div><div class="v">${eur0(juroAno)}<span class="small muted">/ano</span></div><div class="h">${eur(juroAno / 12)} por mês</div></div>
+          <div class="kpi"><div class="label">Taxa média líquida</div><div class="v">${pct2(effAvg)}</div><div class="h">${effAvg < inflation ? 'abaixo' : 'acima'} da inflação (${pct(inflation)})</div></div>
+        </div>` : ''}
+        ${accs.map(accRow).join('') || '<p class="empty">Ainda não tem contas registadas. Adicione as suas contas à ordem e poupanças para ver quanto rendem em juros líquidos.</p>'}
+        ${lost > 1 ? `<p class="small" style="background:var(--accent-soft);padding:10px 12px;border-radius:10px;margin:10px 0 0">Se todo o dinheiro rendesse à melhor taxa que já tem (${pct2(best)} líquida), ganhava mais <b>${eur0(lost)} por ano</b>. Deixe na conta à ordem só o necessário para o dia a dia.</p>` : ''}
+        <div style="margin-top:10px"><button class="btn small" data-act="acc-add">+ Adicionar conta</button></div>
+        ${!accs.length ? '' : hist.length > 1 ? `<div class="chart" style="margin-top:14px"><div class="label" style="margin-bottom:4px">Evolução do total em contas</div>${lineChart({ labels: hist.map(h => dayShort(h.d)), series: [{ color: 'var(--s3)', values: hist.map(h => h.total), area: true }], tips: hist.map(h => `${dayShort(h.d)}: ${eur(h.total)}`), h: 150 })}</div>` : '<p class="small muted" style="margin-top:12px">Sempre que atualizar um saldo, o total fica registado e aparece aqui um gráfico da evolução.</p>'}
+      </section>
+      <section class="card"><h2>Carteira de ETFs</h2>
+        ${!E.rows.length ? `<p class="empty">Ainda não tem ETFs. Adicione os ETFs da sua carteira para acompanhar o valor, o ganho e a repartição de cada reforço.</p>${UI.etfOpen === 'new' ? etfEdit(null) : '<div><button class="btn small" data-act="etf-add">+ Adicionar ETF</button></div>'}` : `
+        <div class="kpis" style="margin-bottom:6px">
+          <div class="kpi"><div class="label">Valor</div><div class="v">${eur0(E.totV)}</div><div class="h">Investido ${eur0(E.totI)}</div></div>
+          <div class="kpi"><div class="label">Ganho</div><div class="v" style="color:${E.totV - E.totI < 0 ? 'var(--bad)' : 'var(--good)'}">${eur0(E.totV - E.totI)}</div><div class="h">${pct(E.totI ? (E.totV - E.totI) / E.totI : NaN)}</div></div>
+        </div>
+        ${E.rows.map(r => `<div class="bud"><div class="top"><b>${esc(r.key)}</b><span class="num">${eur(r.val)} <span class="${r.gain < 0 ? '' : ''}" style="color:${r.gain < 0 ? 'var(--bad)' : 'var(--good)'}">${isFinite(r.g) ? (r.gain >= 0 ? '+' : '') + pct(r.g) : ''}</span></span></div>
+          <div class="small muted">${esc(r.name)} · TER ${pct2(r.ter)}${isFinite(r.ann) ? ' · ' + pct(r.ann) + '/ano (aprox.)' : ''}</div>
+          <div class="track" data-tip="${esc(`Peso ${pct(r.w)} · alvo ${pct(r.target)}`)}"><i style="width:${(r.w * 100).toFixed(1)}%"></i></div>
+          <div class="small"><span class="muted">Peso ${pct(r.w)} · alvo ${pct(r.target)}</span>${r.sug >= 0.5 ? ` · <b>próximo reforço: ${eur0(r.sug)}</b>` : ''}</div>
+          ${UI.etfOpen === r.key ? etfEdit(r) : `<div><button class="btn ghost small" data-act="etf-open" data-key="${esc(r.key)}">Editar ETF</button></div>`}</div>`).join('')}
+        ${UI.etfOpen === 'new' ? etfEdit(null) : '<div style="margin-top:10px"><button class="btn small" data-act="etf-add">+ Adicionar ETF</button></div>'}
+        <div class="field" style="margin-top:12px"><label class="label" for="next-contrib">Próximo reforço (para calcular a repartição)</label><input id="next-contrib" inputmode="decimal" class="inp" value="${esc(String(S.settings.nextContribution ?? ''))}"></div>
+        ${E.evo.length > 1 ? `<div class="chart" style="margin-top:14px">${legend([['Valor', 'var(--s1)'], ['Investido', 'var(--s2)']])}${lineChart({ labels: E.evo.map(x => monthShort(x.d.slice(0, 7))), series: [{ color: 'var(--s1)', values: E.evo.map(x => x.v), area: true }, { color: 'var(--s2)', values: E.evo.map(x => x.iv) }], tips: E.evo.map(x => `${dayShort(x.d)} ${x.d.slice(0, 4)}\nValor: ${eur(x.v)}\nInvestido: ${eur(x.iv)}\nGanho: ${eur(x.v - x.iv)}`), h: 180 })}</div>` : ''}
+        <form class="edit" id="etf-form" style="margin-top:14px" autocomplete="off">
+          <div class="label">Atualizar valores (uma vez por mês)</div>
+          <div class="field"><label class="small" for="etf-date">Data</label><input type="date" id="etf-date" value="${today()}"></div>
+          ${E.rows.map(r => `<div class="row2"><div class="field"><label class="small" for="etf-inv-${esc(r.key)}">${esc(r.key)}: investi hoje</label><input id="etf-inv-${esc(r.key)}" inputmode="decimal" placeholder="0"></div><div class="field"><label class="small" for="etf-val-${esc(r.key)}">valor atual</label><input id="etf-val-${esc(r.key)}" inputmode="decimal" placeholder="${esc(String(r.val.toFixed(2)).replace('.', ','))}"></div></div>`).join('')}
+          <button class="btn" type="submit">Guardar valores</button>
+        </form>`}
+      </section>
+    </div>
+  </div>`;
+}
+function etfEdit(r) {
+  const t = r || { key: '', name: '', ter: 0, target: 0 };
+  const num = v => v ? esc(String(+(v * 100).toFixed(3)).replace('.', ',')) : '';
+  return `<form class="edit" id="etf-def" data-key="${esc(t.key)}" autocomplete="off">
+    <div class="row2"><div class="field"><label class="small" for="etfd-key">Nome curto</label><input id="etfd-key" value="${esc(t.key)}" placeholder="ex.: World"></div>
+    <div class="field"><label class="small" for="etfd-name">Nome completo</label><input id="etfd-name" value="${esc(t.name)}" placeholder="ex.: iShares Core MSCI World"></div></div>
+    <div class="row2"><div class="field"><label class="small" for="etfd-ter">Custo anual, TER (%)</label><input id="etfd-ter" inputmode="decimal" value="${num(t.ter)}" placeholder="0,2"></div>
+    <div class="field"><label class="small" for="etfd-target">Peso alvo na carteira (%)</label><input id="etfd-target" inputmode="decimal" value="${num(t.target)}" placeholder="60"></div></div>
+    <div class="row2"><button class="btn" type="submit">${r ? 'Guardar' : 'Adicionar ETF'}</button><button class="btn" type="button" data-act="etf-close">Cancelar</button></div>
+    ${r ? `<button class="btn danger small" type="button" data-act="etf-del" data-key="${esc(r.key)}">${UI.confirmEtf ? 'Confirmar: remover o ETF e os seus registos' : 'Remover ETF'}</button>` : ''}
+  </form>`;
+}
+function accEdit(a) {
+  const id = esc(a.id);
+  return `<form class="edit" data-acc="${id}" autocomplete="off">
+    <div class="row2"><div class="field"><label class="small" for="acc-bank-${id}">Banco</label><input id="acc-bank-${id}" value="${esc(a.bank)}"></div>
+    <div class="field"><label class="small" for="acc-prod-${id}">Produto</label><input id="acc-prod-${id}" value="${esc(a.product)}"></div></div>
+    <div class="row2"><div class="field"><label class="small" for="acc-bal-${id}">Saldo (€)</label><input id="acc-bal-${id}" inputmode="decimal" value="${esc(String(a.balance).replace('.', ','))}"></div>
+    <div class="field"><label class="small" for="acc-tanb-${id}">TANB (%)</label><input id="acc-tanb-${id}" inputmode="decimal" value="${esc(String(+(a.tanb * 100).toFixed(3)).replace('.', ','))}"></div></div>
+    <div class="row2"><div class="field"><label class="small" for="acc-cap-${id}">Juros pagos</label><select id="acc-cap-${id}">${Object.keys(CAPN).map(k => `<option ${a.cap === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+    <div class="field"><label class="small" for="acc-irs-${id}">Retenção IRS</label><select id="acc-irs-${id}"><option value="1" ${a.irs ? 'selected' : ''}>Sim (${pct(S.settings.irs)})</option><option value="0" ${a.irs ? '' : 'selected'}>Não</option></select></div></div>
+    <div class="row2"><button class="btn" type="submit">Guardar</button><button class="btn" type="button" data-act="acc-close">Cancelar</button></div>
+    <button class="btn danger small" type="button" data-act="acc-del" data-id="${id}">${UI.confirmAcc === a.id ? 'Confirmar remover conta' : 'Remover conta'}</button>
+  </form>`;
+}
+
+function viewAjustes() {
+  const used = {}; for (const x of allTx()) used[x.c] = (used[x.c] || 0) + 1;
+  const block = type => {
+    const nat = SPEND.includes(type);
+    const cats = S.cats.map((c, i) => [c, i]).filter(([c]) => c.type === type);
+    return `<section class="card"><h2>${type === 'Conta fixa' ? 'Contas fixas' : type === 'Dívida' ? 'Dívidas' : type === 'Receita' ? 'Receitas' : type === 'Poupança' ? 'Poupança e investimento' : 'Despesas variáveis'}</h2>
+      <div class="catrow ${nat ? '' : 'nonat'} label" style="border:0"><span>Categoria</span><span>Orç./mês</span>${nat ? '<span class="nat">Natureza</span>' : ''}<span></span></div>
+      ${cats.map(([c, i]) => `<div class="catrow ${nat ? '' : 'nonat'}"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}${used[c.name] ? ` <span class="muted small">(${used[c.name]})</span>` : ''}</span>
+        <input class="inp num" id="cb-${i}" data-cat="${i}" data-f="budget" inputmode="decimal" value="${c.budget ? esc(String(c.budget).replace('.', ',')) : ''}" placeholder="–" aria-label="Orçamento mensal de ${esc(c.name)}">
+        ${nat ? `<select class="inp nat" id="cn-${i}" data-cat="${i}" data-f="nature" aria-label="Natureza de ${esc(c.name)}"><option value="Necessidade" ${c.nature !== 'Desejo' ? 'selected' : ''}>Necessidade</option><option value="Desejo" ${c.nature === 'Desejo' ? 'selected' : ''}>Desejo</option></select>` : ''}
+        <button class="x" data-act="cat-del" data-i="${i}" aria-label="Remover ${esc(c.name)}" ${used[c.name] ? 'disabled title="Tem movimentos registados"' : ''}>×</button></div>`).join('')}
+    </section>`;
+  };
+  const s = S.settings;
+  return `
+  <header class="top"><h1>Ajustes</h1></header>
+  <div class="stack">
+    <form class="card stack" id="cat-add" autocomplete="off"><h2>Nova categoria</h2>
+      <div class="row2"><div class="field"><label class="small" for="nc-name">Nome</label><input id="nc-name" placeholder="ex.: Animais"></div>
+      <div class="field"><label class="small" for="nc-type">Tipo</label><select id="nc-type">${TYPES.map(t => `<option ${UI.addCatType === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
+      <button class="btn" type="submit">Adicionar</button></form>
+    <div class="grid2">${['Despesa', 'Conta fixa'].map(block).join('')}</div>
+    <div class="grid2">${['Receita', 'Poupança'].map(block).join('')}${block('Dívida')}
+      <section class="card stack"><h2>Parâmetros</h2>
+        <div class="row2"><div class="field"><label class="small" for="set-infl">Inflação anual esperada (%)</label><input id="set-infl" class="inp" inputmode="decimal" value="${esc(String(+(s.inflation * 100).toFixed(2)).replace('.', ','))}"></div>
+        <div class="field"><label class="small" for="set-irs">IRS sobre juros (%)</label><input id="set-irs" class="inp" inputmode="decimal" value="${esc(String(+(s.irs * 100).toFixed(2)).replace('.', ','))}"></div></div>
+        <p class="small muted">A inflação de 2% é o objetivo do BCE; atualize com a previsão mais recente do Banco de Portugal. Os juros de depósitos em Portugal têm retenção de 28%.</p>
+      </section>
+      ${backupCard()}
+    </div>
+  </div>`;
+}
+
+function restoreBlock() {
+  const pr = UI.pendingRestore;
+  return pr ? `<div class="edit"><b>Importar esta cópia?</b><span class="small">${pr.count} movimentos${pr.from ? ', de ' + esc(dayShort(pr.from)) + ' ' + pr.from.slice(0, 4) + ' a ' + esc(dayShort(pr.to)) + ' ' + pr.to.slice(0, 4) : ''}, com as categorias, contas e ETFs. Substitui <b>todos</b> os dados atuais.</span>
+      <div class="row2"><button class="btn danger" data-act="restore-ok">Importar e substituir</button><button class="btn" data-act="restore-cancel">Cancelar</button></div></div>`
+    : `<label class="btn" for="restore-file" style="text-align:center">Importar uma cópia…</label><input type="file" id="restore-file" accept="application/json,.json" hidden>`;
+}
+function welcomeCard() {
+  return `<section class="card stack"><h2>Bem-vindo ao Livro de Contas</h2>
+    <p class="small">Registe a primeira despesa aqui em baixo. Já tem categorias base criadas; pode mudá-las, apagá-las ou definir orçamentos em Ajustes.</p>
+    <p class="small muted">Já tem dados de outro telemóvel ou da página Livro de Contas? Importe a cópia de segurança (ficheiro .json) e continua com todo o histórico.</p>
+    ${restoreBlock()}</section>`;
+}
+function backupCard() {
+  const last = S.settings.lastBackup, app = host.kind === 'app';
+  return `<section class="card stack"><h2>Cópia de segurança</h2>
+    <p class="small muted">${app ? 'Os dados ficam só neste telemóvel. Guarde uma cópia de vez em quando (por exemplo no Google Drive) para não os perder se mudar ou perder o telemóvel.' : 'Guarde uma cópia completa dos dados num ficheiro. Serve também para passar tudo para a app Android.'}</p>
+    <p class="small">${last ? 'Última cópia: <b>' + esc(dayShort(last)) + ' ' + esc(last.slice(0, 4)) + '</b>' : 'Ainda não guardou nenhuma cópia.'}</p>
+    <button class="btn" data-act="backup" ${host.saveFile ? '' : 'disabled'}>${app ? 'Guardar cópia (partilhar ou guardar no Drive)' : 'Descarregar cópia completa'}</button>
+    ${restoreBlock()}
+    <h2 style="margin-top:6px">Exportar para Excel</h2>
+    <p class="small muted">Tudo numa folha Excel: movimentos, resumo de cada mês, categorias com totais e médias, contas e ETFs.</p>
+    <button class="btn" data-act="export" ${host.saveFile ? '' : 'disabled'}>Exportar para Excel (.xlsx)</button>
+  </section>`;
+}
+function snapshotAll() {
+  const docs = {};
+  for (const [k, items] of Object.entries(S.months)) docs['tx/' + k] = { items };
+  docs['config/categories'] = { cats: S.cats };
+  docs['config/settings'] = S.settings;
+  docs['config/accounts'] = S.accounts;
+  docs['config/etfs'] = S.etfs;
+  return { app: 'livro-de-contas', format: 1, exportedAt: new Date().toISOString(), docs: JSON.parse(JSON.stringify(docs)) };
+}
+async function doBackup() {
+  const d = today();
+  const prev = S.settings.lastBackup;
+  S.settings.lastBackup = d;
+  try {
+    await host.saveFile(`livro-de-contas-copia-${d}.json`, JSON.stringify(snapshotAll()), 'application/json');
+    saveSettings(); render(); toast('Cópia criada');
+  } catch (e) { S.settings.lastBackup = prev; toast('A cópia foi cancelada ou não está disponível.'); }
+}
+function readRestoreFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const j = JSON.parse(r.result);
+      if (j.app !== 'livro-de-contas' || !j.docs || typeof j.docs !== 'object') throw 0;
+      const tx = Object.entries(j.docs).filter(([k]) => /^tx\/\d{4}-\d{2}$/.test(k)).flatMap(([, v]) => (v && v.items) || []);
+      const ds = tx.map(x => x.d).filter(Boolean).sort();
+      UI.pendingRestore = { data: j, count: tx.length, from: ds[0], to: ds[ds.length - 1] }; render();
+    } catch (e) { toast('Este ficheiro não é uma cópia do Livro de Contas.'); }
+  };
+  r.readAsText(file);
+}
+async function doRestore() {
+  const docs = UI.pendingRestore.data.docs; UI.pendingRestore = null;
+  const writes = [];
+  for (const k of Object.keys(S.months)) if (!docs['tx/' + k]) writes.push(db.doc('tx/' + k).delete());
+  for (const [path, data] of Object.entries(docs)) {
+    if (!/^(tx\/\d{4}-\d{2}|config\/(categories|settings|accounts|etfs))$/.test(path) || !data || typeof data !== 'object') continue;
+    writes.push(writeDoc(path, data));
+  }
+  render();
+  try { await Promise.all(writes); toast('Dados importados'); } catch (e) { toast('Não foi possível importar todos os dados. Tente outra vez.'); }
+}
+
+// ---------- render ----------
+const ICONS = {
+  registar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+  mes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
+  ano: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20v-9M20 20V4"/></svg>',
+  patrimonio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/></svg>',
+  ajustes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+};
+const TABS = [['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património'], ['ajustes', 'Ajustes']];
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = TABS.map(([k, l]) => `<button type="button" data-tab="${k}" ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
+}
+function render() {
+  if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
+  const a = document.activeElement, aid = a && a.id, sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+  const html = (S.dbState === 'off' ? '<div class="banner">' + offMsg() + '</div>' : '') +
+    ({ registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
+  document.getElementById('app').innerHTML = html;
+  renderTabs();
+  if (aid) { const el = document.getElementById(aid); if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
+}
+function go(v) { view = v; F.confirmDel = false; render(); window.scrollTo(0, 0); try { localStorage.setItem('ldc-view', v); } catch (e) {} }
+
+// ---------- events ----------
+document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); });
+const app = document.getElementById('app');
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, v = b.dataset.v;
+  if (act === 'type') { F.type = v; if (catType(F.cat) !== v) F.cat = ''; render(); }
+  else if (act === 'cat') { F.cat = F.cat === v ? '' : v; render(); }
+  else if (act === 'date') { F.date = v; render(); }
+  else if (act === 'more-recent') { UI.showAllRecent = !UI.showAllRecent; render(); }
+  else if (act === 'edit') { const t = findTx(b.dataset.id); if (!t) return; Object.assign(F, { editing: t.id, type: catType(t.c), amount: String(t.v).replace('.', ','), cat: t.c, date: t.d, note: t.n || '', confirmDel: false }); go('registar'); }
+  else if (act === 'cancel-edit') { resetForm(); render(); }
+  else if (act === 'del-edit') {
+    if (!F.confirmDel) { F.confirmDel = true; render(); return; }
+    const old = findTx(F.editing); resetForm(); if (!old) { render(); return; } removeTx(old.id);
+    toast(`Apagado: ${old.c} ${eur(old.v)}`, { label: 'Desfazer', fn: () => addTx(old) });
+  }
+  else if (act === 'prev-m') { curMonth = addMonths(curMonth, -1); render(); }
+  else if (act === 'next-m') { curMonth = addMonths(curMonth, 1); render(); }
+  else if (act === 'year') { yearSel = v; render(); }
+  else if (act === 'acc-open') { UI.openAcc = b.dataset.id; UI.confirmAcc = null; render(); }
+  else if (act === 'acc-close') { UI.openAcc = null; render(); }
+  else if (act === 'etf-add') { UI.etfOpen = 'new'; UI.confirmEtf = false; render(); const el = document.getElementById('etfd-key'); if (el) el.focus(); }
+  else if (act === 'etf-open') { UI.etfOpen = b.dataset.key; UI.confirmEtf = false; render(); }
+  else if (act === 'etf-close') { UI.etfOpen = null; UI.confirmEtf = false; render(); }
+  else if (act === 'etf-del') {
+    if (!UI.confirmEtf) { UI.confirmEtf = true; render(); return; }
+    const k = b.dataset.key; S.etfs.etfs = S.etfs.etfs.filter(e => e.key !== k); S.etfs.snaps = S.etfs.snaps.filter(x => x.e !== k);
+    UI.etfOpen = null; UI.confirmEtf = false; saveEtfs(); render(); toast(`ETF removido: ${k}`);
+  }
+  else if (act === 'acc-add') { const id = 'a' + Date.now().toString(36); S.accounts.accounts.push({ id, bank: 'Novo banco', product: 'Conta poupança', balance: 0, tanb: 0, cap: 'Mensal', irs: true }); UI.openAcc = id; render(); }
+  else if (act === 'acc-del') {
+    if (UI.confirmAcc !== b.dataset.id) { UI.confirmAcc = b.dataset.id; render(); return; }
+    S.accounts.accounts = S.accounts.accounts.filter(a => a.id !== b.dataset.id); UI.openAcc = null; recordHistory(); saveAccounts(); render();
+  }
+  else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
+  else if (act === 'export') exportXlsx();
+  else if (act === 'backup') doBackup();
+  else if (act === 'restore-ok') doRestore();
+  else if (act === 'restore-cancel') { UI.pendingRestore = null; render(); }
+});
+app.addEventListener('input', e => {
+  const id = e.target.id;
+  if (id === 'f-amount') { F.amount = e.target.value; refreshSave(); }
+  else if (id === 'f-note') F.note = e.target.value;
+});
+app.addEventListener('change', e => {
+  const t = e.target, id = t.id;
+  if (id === 'f-date') { if (t.value) { F.date = t.value; render(); } }
+  else if (id === 'next-contrib') { const v = parseAmount(t.value); if (v >= 0) { S.settings.nextContribution = v; saveSettings(); render(); } }
+  else if (id === 'set-infl' || id === 'set-irs') { const v = parseAmount(t.value); if (v >= 0) { S.settings[id === 'set-infl' ? 'inflation' : 'irs'] = v / 100; saveSettings(); render(); } }
+  else if (id === 'nc-type') UI.addCatType = t.value;
+  else if (id === 'restore-file') { if (t.files && t.files[0]) readRestoreFile(t.files[0]); }
+  else if (t.dataset.cat != null) {
+    const c = S.cats[+t.dataset.cat]; if (!c) return;
+    if (t.dataset.f === 'budget') { const v = t.value.trim() === '' ? 0 : parseAmount(t.value); if (!(v >= 0)) { toast('Orçamento inválido: use um número, ex.: 120 ou 45,50.'); return; } c.budget = v; }
+    else c.nature = t.value;
+    saveCats();
+  }
+});
+function refreshSave() {
+  const btn = document.querySelector('#entry button[type=submit]'); if (!btn) return;
+  const amt = parseAmount(F.amount), ok = amt > 0 && F.cat && F.date;
+  btn.disabled = !ok; if (!F.editing) btn.textContent = ok ? `Guardar ${eur(amt)}` : 'Guardar';
+}
+function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false }); }
+app.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.id === 'entry') {
+    const v = parseAmount(F.amount);
+    if (!(v > 0) || !F.cat) return;
+    if (F.editing) {
+      const old = findTx(F.editing); const upd = { ...old, v, c: F.cat, d: F.date, n: F.note.trim() };
+      if (monthKey(old.d) === monthKey(upd.d)) { const k = monthKey(old.d); S.months[k] = S.months[k].map(x => x.id === old.id ? upd : x); saveMonth(k); }
+      else { removeTx(old.id); addTx(upd); }
+      resetForm(); render(); toast('Alterações guardadas');
+    } else {
+      const item = { id: newId(), d: F.date, v, c: F.cat, n: F.note.trim(), m: '' };
+      const type = F.type; resetForm(); F.type = type;
+      addTx(item);
+      toast(`Guardado: ${item.c} ${eur(v)}`, { label: 'Desfazer', fn: () => removeTx(item.id) });
+      const el = document.getElementById('f-amount'); if (el) el.focus();
+    }
+  } else if (f.dataset.acc) {
+    const a = S.accounts.accounts.find(x => x.id === f.dataset.acc); if (!a) return;
+    const id = a.id, g = s => document.getElementById(`acc-${s}-${id}`).value;
+    const bal = parseAmount(g('bal')), tanb = parseAmount(g('tanb'));
+    if (!(bal >= 0) || !(tanb >= 0)) { toast('Saldo ou TANB inválido: use números, ex.: 2500,50 e 1,5.'); return; }
+    Object.assign(a, { bank: g('bank').trim() || a.bank, product: g('prod').trim(), balance: bal, tanb: tanb / 100, cap: g('cap'), irs: g('irs') === '1' });
+    UI.openAcc = null; recordHistory(); saveAccounts(); render(); toast('Conta atualizada');
+  } else if (f.id === 'etf-def') {
+    const old = f.dataset.key, g = id => document.getElementById(id).value.trim();
+    const key = g('etfd-key'), ter = g('etfd-ter') ? parseAmount(g('etfd-ter')) : 0, target = g('etfd-target') ? parseAmount(g('etfd-target')) : 0;
+    if (!key) { toast('Escreva um nome curto para o ETF.'); return; }
+    if (!(ter >= 0) || !(target >= 0) || target > 100) { toast('TER ou peso alvo inválido: use números, ex.: 0,2 e 60.'); return; }
+    if (key !== old && S.etfs.etfs.some(e => e.key.toLowerCase() === key.toLowerCase())) { toast('Já existe um ETF com esse nome curto.'); return; }
+    const def = { key, name: g('etfd-name'), ter: ter / 100, target: target / 100 };
+    if (old) { S.etfs.etfs = S.etfs.etfs.map(e => e.key === old ? def : e); if (key !== old) S.etfs.snaps = S.etfs.snaps.map(x => x.e === old ? { ...x, e: key } : x); }
+    else S.etfs.etfs = [...S.etfs.etfs, def];
+    UI.etfOpen = null; saveEtfs(); render();
+    const sum = S.etfs.etfs.reduce((a, e) => a + (e.target || 0), 0);
+    toast(old ? 'ETF atualizado' : `ETF adicionado: ${key}` + (Math.abs(sum - 1) > 0.001 ? ` · os pesos alvo somam ${pct(sum)}` : ''));
+  } else if (f.id === 'etf-form') {
+    const d = document.getElementById('etf-date').value || today();
+    const add = [];
+    for (const r of S.etfs.etfs) {
+      const inv = parseAmount(document.getElementById('etf-inv-' + r.key).value), val = parseAmount(document.getElementById('etf-val-' + r.key).value);
+      if (isFinite(val) && val >= 0) add.push({ d, e: r.key, inv: isFinite(inv) ? inv : 0, val });
+      else if (isFinite(inv) && inv > 0) { toast(`Indique também o valor atual de ${r.key}.`); return; }
+    }
+    if (!add.length) { toast('Preencha o valor atual de pelo menos um ETF.'); return; }
+    S.etfs.snaps = [...S.etfs.snaps, ...add]; saveEtfs(); render(); toast(`Valores guardados para ${add.length} ETF${add.length > 1 ? 's' : ''}`);
+  } else if (f.id === 'cat-add') {
+    const name = document.getElementById('nc-name').value.trim(), type = document.getElementById('nc-type').value;
+    if (!name) { toast('Escreva o nome da categoria.'); return; }
+    if (S.cats.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('Já existe uma categoria com esse nome.'); return; }
+    S.cats.push({ name, type, budget: 0, nature: SPEND.includes(type) ? 'Necessidade' : '' }); UI.addCatType = type; saveCats(); render(); toast(`Categoria criada: ${name}`);
+  }
+});
+function recordHistory() {
+  const total = S.accounts.accounts.reduce((s, a) => s + (+a.balance || 0), 0), d = today();
+  S.accounts.history = (S.accounts.history || []).filter(h => h.d !== d).concat([{ d, total }]);
+}
+// ---------- Excel export (.xlsx written by hand: a zip of XML parts) ----------
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const now = new Date(), dt = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1), dd = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  let off = 0;
+  for (const [name, text] of files) {
+    const nb = enc.encode(name), data = enc.encode(text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, dt, 2], [12, dd, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, nb.length, 2], [28, 0, 2]].forEach(([o, v, n]) => n === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const c = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, dt, 2], [14, dd, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, nb.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, off, 4]].forEach(([o, v, n]) => n === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+    parts.push(new Uint8Array(h.buffer), nb, data); central.push(new Uint8Array(c.buffer), nb);
+    off += 30 + nb.length + data.length;
+  }
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, files.length, 2], [10, files.length, 2], [12, cdSize, 4], [16, off, 4], [20, 0, 2]].forEach(([o, v, n]) => n === 4 ? e.setUint32(o, v, true) : e.setUint16(o, v, true));
+  const all = [...parts, ...central, new Uint8Array(e.buffer)], out = new Uint8Array(all.reduce((a, b) => a + b.length, 0));
+  let p = 0; for (const a of all) { out.set(a, p); p += a.length; }
+  return out;
+}
+// Cells: string, number, null, or { v, s } with s = 'h' header, 'eur', 'date', 'month', 'pct', 'b' bold, 'beur' bold euro
+const XS = { h: 1, eur: 2, date: 3, pct: 4, month: 5, b: 6, beur: 7, bpct: 8 };
+function xlsxFile(sheets) {
+  const x = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
+  const serial = iso => { const [y, m, d] = iso.split('-').map(Number); return (Date.UTC(y, m - 1, d || 1) - Date.UTC(1899, 11, 30)) / 864e5; };
+  const cell = (c, r, i) => {
+    if (c == null || c === '') return '';
+    const o = typeof c === 'object' ? c : { v: c }, ref = col(i) + r, st = o.s ? ` s="${XS[o.s]}"` : '';
+    if (o.s === 'date' || o.s === 'month') return `<c r="${ref}"${st}><v>${serial(o.v)}</v></c>`;
+    if (typeof o.v === 'number') return isFinite(o.v) ? `<c r="${ref}"${st}><v>${Math.round(o.v * 1e6) / 1e6}</v></c>` : '';
+    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${x(o.v)}</t></is></c>`;
+  };
+  const sheetXml = sh => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sh.rows.map((row, ri) => `<row r="${ri + 1}">${row.map((c, ci) => cell(c, ri + 1, ci)).join('')}</row>`).join('')}</sheetData>${sh.rows.length > 1 ? `<autoFilter ref="A1:${col(sh.rows[0].length - 1)}${sh.filterTo || sh.rows.length}"/>` : ''}</worksheet>`;
+  const files = [
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh, i) => `<sheet name="${x(sh.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><definedNames>${sheets.map((sh, i) => sh.rows.length > 1 ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${x(sh.name)}'!$A$1:$${col(sh.rows[0].length - 1)}$${sh.filterTo || sh.rows.length}</definedName>` : '').join('')}</definedNames></workbook>`],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0.00\\ &quot;€&quot;"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/><numFmt numFmtId="166" formatCode="mmm yyyy"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F5FD1"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="10" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+    ...sheets.map((sh, i) => [`xl/worksheets/sheet${i + 1}.xml`, sheetXml(sh)]),
+  ];
+  return zipStore(files);
+}
+function workbookData() {
+  const H = a => a.map(v => ({ v, s: 'h' })), E = v => ({ v: Math.round(v * 100) / 100, s: 'eur' }), P = v => ({ v, s: 'pct' });
+  const tx = allTx().slice().sort((a, b) => a.d.localeCompare(b.d) || a.id.localeCompare(b.id));
+  const natOf = c => (S.cats.find(k => k.name === c) || {}).nature || '';
+  const mov = [H(['Data', 'Mês', 'Tipo', 'Categoria', 'Valor', 'Nota', 'Natureza'])].concat(tx.map(x => [{ v: x.d, s: 'date' }, { v: x.d.slice(0, 7), s: 'month' }, catType(x.c), x.c, E(x.v), x.n || '', natOf(x.c)]));
+  const keys = Object.keys(S.months).filter(k => S.months[k].length).sort();
+  const per = keys.map(k => [k, totalsOf(S.months[k])]);
+  const sum = f => per.reduce((a, [, t]) => a + f(t), 0), n = per.length || 1;
+  const mrow = (t, lbl, st) => [lbl, (st === 'b' ? { v: t.Receita, s: 'beur' } : E(t.Receita)), E(t.Despesa), E(t['Conta fixa']), E(t.Dívida), (st === 'b' ? { v: t.gastos, s: 'beur' } : E(t.gastos)), E(t.poupado), { v: t.taxa, s: st === 'b' ? 'bpct' : 'pct' }, E(t.Poupança)];
+  const totT = totalsOf(tx), avgT = {}; for (const k of Object.keys(totT)) avgT[k] = totT[k] / n; avgT.taxa = totT.taxa;
+  const mensal = [H(['Mês', 'Receitas', 'Despesas variáveis', 'Contas fixas', 'Dívidas', 'Total gastos', 'Sobrou', 'Taxa de poupança', 'Poupança e investimento'])]
+    .concat(per.map(([k, t]) => mrow(t, { v: k, s: 'month' })))
+    .concat(per.length ? [[], mrow(totT, { v: 'Total', s: 'b' }, 'b'), mrow(avgT, { v: 'Média mensal', s: 'b' }, 'b')] : []);
+  const byCat = {}; for (const x of tx) byCat[x.c] = (byCat[x.c] || 0) + x.v;
+  const catNames = [...new Set([...S.cats.map(c => c.name), ...Object.keys(byCat)])];
+  const cats = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'Total', 'Média mensal', 'Movimentos'])]
+    .concat(catNames.map(c => { const k = S.cats.find(z => z.name === c) || {}; return [c, catType(c), k.nature || '', E(+k.budget || 0), E(byCat[c] || 0), E((byCat[c] || 0) / n), tx.filter(x => x.c === c).length]; }));
+  const accs = S.accounts.accounts || [];
+  const contas = [H(['Banco', 'Produto', 'Saldo', 'TANB', 'Juros pagos', 'Retenção IRS', 'Taxa líquida efetiva', 'Juros líquidos por ano', 'Juros líquidos por mês'])]
+    .concat(accs.map(a => { const c = accCalc(a); return [a.bank, a.product, E(+a.balance || 0), P(+a.tanb || 0), a.cap, a.irs ? 'Sim' : 'Não', P(c.eff), E(c.year), E(c.month)]; }))
+    .concat(accs.length ? [[], [{ v: 'Total', s: 'b' }, '', { v: accs.reduce((s, a) => s + (+a.balance || 0), 0), s: 'beur' }, '', '', '', '', { v: accs.reduce((s, a) => s + accCalc(a).year, 0), s: 'beur' }, { v: accs.reduce((s, a) => s + accCalc(a).month, 0), s: 'beur' }]] : []);
+  const histo = [H(['Data', 'Total em contas'])].concat((S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d)).map(h => [{ v: h.d, s: 'date' }, E(h.total)]));
+  const EC = etfCalc();
+  const etfs = [H(['ETF', 'Nome', 'TER', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso atual', 'Último registo'])]
+    .concat(EC.rows.map(r => [r.key, r.name || '', P(r.ter || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '']));
+  const snaps = [H(['Data', 'ETF', 'Investido nesse dia', 'Valor nesse dia'])].concat((S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.e.localeCompare(b.e)).map(x => [{ v: x.d, s: 'date' }, x.e, E(+x.inv || 0), E(+x.val || 0)]));
+  return [
+    { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
+    { name: 'Resumo mensal', cols: [12, 13, 18, 14, 12, 14, 13, 16, 22], rows: mensal, filterTo: per.length + 1 },
+    { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
+    { name: 'Contas', cols: [18, 20, 13, 9, 12, 13, 18, 20, 20], rows: contas, filterTo: accs.length + 1 },
+    { name: 'Contas histórico', cols: [12, 16], rows: histo },
+    { name: 'ETFs', cols: [12, 40, 8, 10, 13, 13, 12, 10, 11, 14], rows: etfs },
+    { name: 'ETFs registos', cols: [12, 12, 20, 16], rows: snaps },
+  ];
+}
+async function exportXlsx() {
+  try { await host.saveFile(`livro-de-contas-${today()}.xlsx`, xlsxFile(workbookData()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+  catch (e) { toast('A exportação foi cancelada ou não está disponível.'); }
+}
+
+// ---------- boot ----------
+try { const v = localStorage.getItem('ldc-view'); if (v && TABS.some(t => t[0] === v)) view = v; } catch (e) {}
+renderTabs();
+(async () => {
+  if (window.LDC) {
+    // Android app: data lives on the phone (see src/native.js)
+    host = { kind: 'app', saveFile: window.LDC.saveFile };
+    db = await window.LDC.openDb().catch(() => null);
+  } else {
+    const c = window.claude;
+    const downloads = c && c.use ? await c.use('downloads').catch(() => null) : null;
+    host = { kind: 'artifact', saveFile: downloads ? (name, data, mime) => downloads.save({ filename: name, data: new Blob([data], { type: mime }) }) : null };
+    db = c && c.use ? await c.use('db').catch(() => null) : null;
+  }
+  if (!db) {
+    S.dbState = 'off'; S.loaded.tx = S.loaded.categories = true;
+    document.getElementById('app').innerHTML = '<header class="top"><h1>Livro de Contas</h1></header><div class="banner">' + offMsg() + '</div>';
+    return;
+  }
+  S.dbState = 'on';
+  const err = e => { if (e && e.code === 'revoked') { S.dbState = 'off'; render(); } };
+  const sig = {};
+  db.collection('tx').onSnapshot(snap => {
+    const m = {}; snap.docs.forEach(d => { m[d.id] = ((d.data() || {}).items || []).slice(); });
+    const s = JSON.stringify(m); if (s === sig.tx && S.loaded.tx) return; sig.tx = s;
+    S.months = m; S.loaded.tx = true; render();
+  }, err);
+  const watch = (id, apply) => db.doc('config/' + id).onSnapshot(d => {
+    const data = d.exists ? d.data() : null; const s = JSON.stringify(data); if (s === sig[id] && S.loaded[id]) return; sig[id] = s;
+    if (data) apply(JSON.parse(s)); S.loaded[id] = true; render();
+  }, err);
+  watch('categories', d => { S.cats = d.cats || []; });
+  watch('settings', d => { S.settings = Object.assign(S.settings, d); });
+  watch('accounts', d => { S.accounts = { accounts: d.accounts || [], history: d.history || [] }; });
+  watch('etfs', d => { S.etfs = { etfs: d.etfs || [], snaps: d.snaps || [] }; });
+})();
+})();
+</script>
