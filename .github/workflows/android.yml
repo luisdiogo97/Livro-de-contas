@@ -57,7 +57,15 @@ jobs:
           LDC_VERSION_NAME: 1.${{ github.run_number }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          set -o pipefail
+          if ! ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"; then
+            # Surface the end of the log as an annotation, readable without downloading logs.
+            grep -n -E "What went wrong|error:|FAILURE|Exception|Could not" "$RUNNER_TEMP/gradle.log" | head -40 > "$RUNNER_TEMP/gradle.err" || true
+            tail -60 "$RUNNER_TEMP/gradle.log" >> "$RUNNER_TEMP/gradle.err"
+            msg=$(sed -e 's/%/%25/g' "$RUNNER_TEMP/gradle.err" | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Gradle::${msg}"
+            exit 1
+          fi
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/livro-de-contas-1.${{ github.run_number }}.apk"
 
       - uses: actions/upload-artifact@v4
