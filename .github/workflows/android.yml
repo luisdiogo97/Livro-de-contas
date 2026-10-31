@@ -1,0 +1,70 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build web app
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Prepare signing key
+        env:
+          LDC_KEYSTORE_B64: ${{ secrets.LDC_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$LDC_KEYSTORE_B64" ]; then
+            echo "::error::Secret LDC_KEYSTORE_B64 is missing. Every build must be signed with the same key."
+            exit 1
+          fi
+          echo "$LDC_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ldc.jks"
+
+      - name: Build signed APK
+        working-directory: android
+        env:
+          LDC_KEYSTORE: ${{ runner.temp }}/ldc.jks
+          LDC_KEYSTORE_PASSWORD: ${{ secrets.LDC_KEYSTORE_PASSWORD }}
+          LDC_KEY_ALIAS: livrodecontas
+          LDC_KEY_PASSWORD: ${{ secrets.LDC_KEYSTORE_PASSWORD }}
+          LDC_VERSION_CODE: ${{ github.run_number }}
+          LDC_VERSION_NAME: 1.${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/livro-de-contas-1.${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: livro-de-contas-apk
+          path: ${{ runner.temp }}/livro-de-contas-*.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.${{ github.run_number }}" "$RUNNER_TEMP"/livro-de-contas-*.apk \
+            --title "Livro de Contas 1.${{ github.run_number }}" \
+            --notes "APK assinado, gerado a partir de ${{ github.sha }}."
