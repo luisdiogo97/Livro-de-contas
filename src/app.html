@@ -85,6 +85,9 @@ nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset
 .field { display: grid; gap: 5px; }
 .field input, .field select, .inp { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 11px; width: 100%; min-width: 0; }
 .field input:focus, .field select:focus, .inp:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.split-box { display: grid; gap: 8px; background: var(--surface-2); border-radius: 11px; padding: 10px 12px; }
+.split-box .res { font-variant-numeric: tabular-nums; }
+.split-box .inp { width: 5.5em; padding: 6px 9px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .btn { border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 600; cursor: pointer; background: var(--surface-2); color: var(--ink); }
 .btn.primary { background: var(--accent); color: var(--on-accent); font-size: 1.05rem; padding: 15px; width: 100%; }
@@ -374,6 +377,62 @@ function lineChart({ labels, series, tips, h = 200 }) {
 }
 const legend = items => `<div class="legend">${items.map(([n, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join('')}</div>`;
 
+// ---------- split (dividir) ----------
+// The user types the total (e.g. 800 € rent) and saves only their share. The item keeps tt (total) and sp (share, 0–1)
+// so editing it shows the total again and the next entry in the same category suggests the same split.
+const SPL = { on: false, share: 0.5, custom: false, pctText: '', ctx: undefined, catSeen: '', auto: false };
+const SPLIT_PRESETS = [[1 / 2, 'Metade'], [1 / 3, '1/3'], [1 / 4, '1/4']];
+const SPLIT_RE = /(?:^| · )total [^·]* a dividir \([^)]*\)$/;
+const splitAllowed = () => SPEND.includes(F.type);
+const splitActive = () => SPL.on && splitAllowed() && SPL.share > 0 && SPL.share < 1;
+const shareLabel = sh => { const p = SPLIT_PRESETS.find(([f]) => Math.abs(f - sh) < 1e-9); return p && p[1] !== 'Metade' ? p[1] : fmtPct(sh); };
+const fmtPct = sh => (Math.round(sh * 10000) / 100).toString().replace('.', ',') + ' %';
+const splitNote = (note, total, sh) => (note ? note + ' · ' : '') + `total ${eur(total)} a dividir (${shareLabel(sh)})`;
+function entryValue() {
+  const total = parseAmount(F.amount);
+  if (SPL.on && splitAllowed() && !splitActive()) return { total, v: NaN, split: false }; // invalid %: block saving
+  if (!(total > 0) || !splitActive()) return { total, v: total, split: false };
+  return { total, v: Math.round(total * SPL.share * 100) / 100, split: true };
+}
+function syncSplit() {
+  // Switching between a new entry and editing (or between edited items): load that item's split, if any.
+  if (SPL.ctx !== F.editing) {
+    SPL.ctx = F.editing; SPL.catSeen = F.cat; SPL.auto = false; SPL.on = false;
+    const t = F.editing ? findTx(F.editing) : null;
+    if (t && t.sp > 0 && t.sp < 1 && t.tt > 0) {
+      Object.assign(SPL, { on: true, share: t.sp, custom: !SPLIT_PRESETS.some(([f]) => Math.abs(f - t.sp) < 1e-9), pctText: fmtPct(t.sp).replace(' %', '') });
+      F.amount = String(t.tt).replace('.', ',');
+      F.note = (t.n || '').replace(SPLIT_RE, '');
+    }
+  }
+  // New entry: picking a category that was split last time suggests the same split.
+  if (!F.editing && F.cat !== SPL.catSeen) {
+    SPL.catSeen = F.cat;
+    const last = F.cat ? allTx().filter(x => x.c === F.cat).sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id))[0] : null;
+    if (last && last.sp > 0 && last.sp < 1) Object.assign(SPL, { on: true, auto: true, share: last.sp, custom: !SPLIT_PRESETS.some(([f]) => Math.abs(f - last.sp) < 1e-9), pctText: fmtPct(last.sp).replace(' %', '') });
+    else if (SPL.auto) Object.assign(SPL, { on: false, auto: false });
+  }
+}
+function splitResult() {
+  const e = entryValue();
+  if (!e.split) return SPL.share > 0 && SPL.share < 1 ? 'Escreva o valor total para ver a sua parte.' : 'Escreva a sua parte em %, entre 1 e 99.';
+  return `A sua parte: <b>${eur(e.v)}</b> de ${eur(e.total)}`;
+}
+function splitBox() {
+  if (!splitAllowed()) return '';
+  const toggle = `<button type="button" class="chip" data-act="split" aria-pressed="${SPL.on}">÷ Dividir</button>`;
+  if (!SPL.on) return `<div class="chips">${toggle}</div>`;
+  return `<div class="split-box">
+    <div class="chips" style="align-items:center">${toggle}<span class="small muted">A minha parte:</span></div>
+    <div class="chips" style="align-items:center">
+      ${SPLIT_PRESETS.map(([f, lab]) => `<button type="button" class="chip" data-act="split-share" data-v="${f}" aria-pressed="${!SPL.custom && Math.abs(SPL.share - f) < 1e-9}">${lab}</button>`).join('')}
+      <button type="button" class="chip" data-act="split-custom" aria-pressed="${SPL.custom}">Outra %</button>
+      ${SPL.custom ? `<label style="display:flex;align-items:center;gap:5px"><input id="f-split-pct" class="inp" inputmode="decimal" placeholder="ex.: 40" value="${esc(SPL.pctText)}" aria-label="A minha parte em percentagem"><span>%</span></label>` : ''}
+    </div>
+    <div class="small res" id="split-res">${splitResult()}</div>
+  </div>`;
+}
+
 // ---------- views ----------
 function viewInicio() {
   const now = new Date(), key = monthKey(today()), items = S.months[key] || [], t = totalsOf(items);
@@ -440,6 +499,7 @@ function viewInicio() {
   </div>`;
 }
 function viewRegistar() {
+  syncSplit();
   const key = monthKey(today());
   const t = totalsOf(S.months[key] || []);
   const budVar = budgetOf('Despesa'), budAll = budVar + budgetOf('Conta fixa');
@@ -462,7 +522,8 @@ function viewRegistar() {
   <div class="stack">
     <form class="card stack" id="entry" autocomplete="off">
       <div class="seg" role="group" aria-label="Tipo">${typesShown.map(tp => `<button type="button" data-act="type" data-v="${tp}" aria-pressed="${F.type === tp}">${tp === 'Conta fixa' ? 'Fixa' : tp}</button>`).join('')}</div>
-      <label class="amount"><input id="f-amount" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" aria-label="Valor em euros"><span>€</span></label>
+      <label class="amount"><input id="f-amount" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" aria-label="${splitActive() ? 'Valor total em euros' : 'Valor em euros'}"><span>€</span></label>
+      ${splitBox()}
       <div class="field"><span class="label">Categoria</span>
         <div class="chips">${cats.map(c => `<button type="button" class="chip" data-act="cat" data-v="${esc(c.name)}" aria-pressed="${F.cat === c.name}">${esc(c.name)}</button>`).join('') || '<span class="empty">Sem categorias deste tipo. Crie-as em Ajustes.</span>'}</div>
       </div>
@@ -474,7 +535,7 @@ function viewRegistar() {
         </div>
       </div>
       <div class="field"><label class="label" for="f-note">Nota (opcional)</label><input id="f-note" placeholder="ex.: jantar com amigos" value="${esc(F.note)}"></div>
-      <button class="btn primary" type="submit" ${canSave ? '' : 'disabled'}>${F.editing ? 'Guardar alterações' : (canSave ? `Guardar ${eur(amt)}` : 'Guardar')}</button>
+      <button class="btn primary" type="submit" ${canSave && entryValue().v > 0 ? '' : 'disabled'}>${F.editing ? 'Guardar alterações' : (canSave ? `Guardar ${eur(entryValue().v)}` : 'Guardar')}</button>
       ${F.editing ? `<div class="row2"><button type="button" class="btn" data-act="cancel-edit">Cancelar</button><button type="button" class="btn danger" data-act="del-edit">${F.confirmDel ? 'Confirmar apagar' : 'Apagar'}</button></div>` : ''}
     </form>
   </div>
@@ -887,6 +948,9 @@ app.addEventListener('click', e => {
     const old = findTx(F.editing); resetForm(); if (!old) { render(); return; } removeTx(old.id);
     toast(`Apagado: ${old.c} ${eur(old.v)}`, { label: 'Desfazer', fn: () => addTx(old) });
   }
+  else if (act === 'split') { SPL.on = !SPL.on; SPL.auto = false; render(); }
+  else if (act === 'split-share') { Object.assign(SPL, { share: +v, custom: false, auto: false }); render(); }
+  else if (act === 'split-custom') { Object.assign(SPL, { custom: true, auto: false, pctText: SPL.pctText || fmtPct(SPL.share).replace(' %', '') }); render(); const el = document.getElementById('f-split-pct'); if (el) { el.focus(); el.select(); } }
   else if (act === 'prev-m') { curMonth = addMonths(curMonth, -1); render(); }
   else if (act === 'next-m') { curMonth = addMonths(curMonth, 1); render(); }
   else if (act === 'year') { yearSel = v; render(); }
@@ -915,6 +979,7 @@ app.addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'f-amount') { F.amount = e.target.value; refreshSave(); }
   else if (id === 'f-note') F.note = e.target.value;
+  else if (id === 'f-split-pct') { SPL.pctText = e.target.value; const p = parseAmount(SPL.pctText); SPL.share = p > 0 && p < 100 ? p / 100 : NaN; refreshSave(); }
 });
 app.addEventListener('change', e => {
   const t = e.target, id = t.id;
@@ -933,23 +998,27 @@ app.addEventListener('change', e => {
 });
 function refreshSave() {
   const btn = document.querySelector('#entry button[type=submit]'); if (!btn) return;
-  const amt = parseAmount(F.amount), ok = amt > 0 && F.cat && F.date;
+  const amt = entryValue().v, ok = amt > 0 && F.cat && F.date;
   btn.disabled = !ok; if (!F.editing) btn.textContent = ok ? `Guardar ${eur(amt)}` : 'Guardar';
+  const res = document.getElementById('split-res'); if (res) res.innerHTML = splitResult();
+  const inp = document.getElementById('f-amount'); if (inp) inp.setAttribute('aria-label', splitActive() ? 'Valor total em euros' : 'Valor em euros');
 }
-function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false }); }
+function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false }); Object.assign(SPL, { on: false, auto: false, catSeen: '' }); }
 app.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target;
   if (f.id === 'entry') {
-    const v = parseAmount(F.amount);
+    const ev = entryValue(), v = ev.v;
     if (!(v > 0) || !F.cat) return;
+    const note = ev.split ? splitNote(F.note.trim(), ev.total, SPL.share) : F.note.trim();
+    const withSplit = it => { const o = { ...it }; delete o.tt; delete o.sp; if (ev.split) { o.tt = ev.total; o.sp = SPL.share; } return o; };
     if (F.editing) {
-      const old = findTx(F.editing); const upd = { ...old, v, c: F.cat, d: F.date, n: F.note.trim() };
+      const old = findTx(F.editing); const upd = withSplit({ ...old, v, c: F.cat, d: F.date, n: note });
       if (monthKey(old.d) === monthKey(upd.d)) { const k = monthKey(old.d); S.months[k] = S.months[k].map(x => x.id === old.id ? upd : x); saveMonth(k); }
       else { removeTx(old.id); addTx(upd); }
       resetForm(); render(); toast('Alterações guardadas');
     } else {
-      const item = { id: newId(), d: F.date, v, c: F.cat, n: F.note.trim(), m: '' };
+      const item = withSplit({ id: newId(), d: F.date, v, c: F.cat, n: note, m: '' });
       const type = F.type; resetForm(); F.type = type;
       addTx(item);
       toast(`Guardado: ${item.c} ${eur(v)}`, { label: 'Desfazer', fn: () => removeTx(item.id) });
