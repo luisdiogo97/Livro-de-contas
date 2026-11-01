@@ -170,6 +170,44 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 @media (max-width: 420px) { .catrow { grid-template-columns: 1fr 84px 34px; } .catrow .nat { grid-column: 1 / -1; } }
 .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; }
 .x:hover { background: var(--surface-2); }
+/* home */
+.hello { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin: 4px 0 16px; }
+.hello h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; letter-spacing: -0.02em; margin: 0; line-height: 1.1; }
+.hello .sub { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+.home-hero { border-radius: 22px; padding: 20px; color: #fff; display: grid; gap: 14px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 140% at 100% 0%, #3f86f0 0%, #1f5fd1 45%, #173f9a 100%); box-shadow: 0 10px 28px -12px rgba(31,95,209,.55); }
+.home-hero::after { content: ""; position: absolute; right: -40px; bottom: -60px; width: 190px; height: 190px; border-radius: 50%; background: rgba(255,255,255,.07); }
+.home-hero .lbl { font-size: 0.82rem; font-weight: 600; opacity: .85; display: flex; justify-content: space-between; gap: 8px; }
+.home-hero .big { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.home-hero .of { font-size: 0.9rem; opacity: .85; margin-top: 4px; }
+.home-hero .meter { height: 10px; border-radius: 99px; background: rgba(255,255,255,.22); overflow: hidden; position: relative; z-index: 1; }
+.home-hero .meter i { display: block; height: 100%; border-radius: 99px; background: #fff; }
+.home-hero .meter i.over { background: #ffb4a8; }
+.home-hero .meter b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: rgba(255,255,255,.75); border-radius: 2px; }
+.home-hero .foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; position: relative; z-index: 1; }
+.home-hero .foot div { background: rgba(255,255,255,.12); border-radius: 14px; padding: 10px 12px; }
+.home-hero .foot span { display: block; font-size: 0.75rem; opacity: .8; font-weight: 600; }
+.home-hero .foot strong { font-family: var(--font-display); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.qa { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 8px; }
+.qa button { border: 1px solid var(--line); background: var(--surface); border-radius: 16px; padding: 12px 6px; display: grid; justify-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.qa button svg { width: 22px; height: 22px; }
+.qa button.main { background: var(--ink); border-color: var(--ink); color: var(--bg); font-size: 0.9rem; grid-auto-flow: column; align-items: center; justify-content: center; }
+.qa .dot { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; }
+.qa .dot svg { width: 18px; height: 18px; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini .card { padding: 14px; }
+.mini .v { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.mini .h { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+.cardhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.cardhead h2 { margin: 0; }
+.where { display: grid; gap: 12px; margin-top: 6px; }
+.where .top { display: flex; justify-content: space-between; gap: 10px; font-size: 0.92rem; margin-bottom: 5px; }
+.where .top span:first-child { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.where .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.patri { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; cursor: pointer; color: inherit; }
+.patri .v { font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+.gear { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; width: 42px; height: 42px; display: grid; place-items: center; cursor: pointer; color: var(--ink-2); flex: none; }
+.gear svg { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: no-preference) { .chip, .btn, .seg button { transition: background-color .15s, color .15s; } }
 </style>
 
@@ -212,7 +250,7 @@ const WEEK = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 // ---------- state ----------
 const S = { months: {}, cats: [], settings: { irs: 0.28, inflation: 0.02, fgd: 100000, nextContribution: 200 }, accounts: { accounts: [], history: [] }, etfs: { etfs: [], snaps: [] }, loaded: { tx: false, categories: false }, dbState: 'pending' };
-let view = 'registar';
+let view = 'inicio';
 let curMonth = monthKey(today());
 let yearSel = 'last12';
 const F = { type: 'Despesa', amount: '', cat: '', date: today(), note: '', editing: null, confirmDel: false };
@@ -396,6 +434,70 @@ function splitBox() {
 }
 
 // ---------- views ----------
+function viewInicio() {
+  const now = new Date(), key = monthKey(today()), items = S.months[key] || [], t = totalsOf(items);
+  const h = now.getHours(), greet = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
+  const name = (S.settings.name || '').trim();
+  const dDone = now.getDate(), dTot = daysInMonth(key), left = dTot - dDone;
+  const isSpend = x => ['Despesa', 'Conta fixa'].includes(catType(x.c));
+  const spent = t.Despesa + t['Conta fixa'], bud = budgetOf('Despesa') + budgetOf('Conta fixa');
+  const prevKey = addMonths(key, -1), prevSame = (S.months[prevKey] || []).filter(x => isSpend(x) && +x.d.slice(8) <= dDone).reduce((a, x) => a + x.v, 0);
+  const diff = prevSame ? spent / prevSame - 1 : NaN;
+  const td = today(), todayV = items.filter(x => x.d === td && isSpend(x)).reduce((a, x) => a + x.v, 0), todayN = items.filter(x => x.d === td).length;
+  const wk = isoOf(new Date(now.getTime() - 6 * 864e5)), weekV = allTx().filter(x => x.d >= wk && x.d <= td && isSpend(x)).reduce((a, x) => a + x.v, 0);
+  const perDay = bud > 0 ? Math.max(0, bud - spent) / (left + 1) : NaN;
+  const byCat = {}; for (const x of items) if (catType(x.c) === 'Despesa') byCat[x.c] = (byCat[x.c] || 0) + x.v;
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 4), topMax = top.length ? top[0][1] : 1;
+  const recent = allTx().filter(x => x.d <= td).slice().sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id)).slice(0, 4);
+  const accs = S.accounts.accounts || [], E = etfCalc();
+  const net = accs.reduce((a, x) => a + (+x.balance || 0), 0) + E.totV, juroMes = accs.reduce((a, x) => a + accCalc(x).month, 0);
+  const usedPct = bud > 0 ? Math.min(1, spent / bud) : 0, dayPct = dDone / dTot;
+  const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', '#8b5cf6'];
+  const ic = {
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    in: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+    save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11a7 6 0 0 1 13-2h1.5v4H18a7 6 0 0 1-3 3v2h-3v-1.5h-2V18H7v-2.5A6 6 0 0 1 5 11z"/><path d="M10 7.5h3"/></svg>',
+    fix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 14h2"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    chev: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+  };
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1), over = bud > 0 && spent > bud;
+  const mName = new Intl.DateTimeFormat('pt-PT', { month: 'long' }).format(now);
+  return `
+  <div class="hello"><div><h1>${greet}${name ? ', ' + esc(name) : ''}</h1><div class="sub">${esc(cap(dayLong(td)))}</div></div>
+    <button class="gear" data-act="goto" data-v="ajustes" aria-label="Ajustes">${ic.gear}</button></div>
+  <div class="stack">
+    ${!allTx().length ? welcomeCard() : ''}
+    <section class="home-hero">
+      <div class="lbl"><span>Gastos de ${esc(mName)}</span><span>${left ? `faltam ${left} dia${left > 1 ? 's' : ''}` : 'último dia'}</span></div>
+      <div><div class="big">${eur(spent)}</div>
+        <div class="of">${bud > 0 ? `de ${eur0(bud)} orçamentados · ${pct(spent / bud)}` : 'Defina orçamentos em Ajustes para ver quanto ainda pode gastar.'}</div></div>
+      ${bud > 0 ? `<div class="meter" role="img" aria-label="${pct(usedPct)} do orçamento usado; ${pct(dayPct)} do mês passou"><i class="${over ? 'over' : ''}" style="width:${(usedPct * 100).toFixed(1)}%"></i><b style="left:${(dayPct * 100).toFixed(1)}%"></b></div>` : ''}
+      <div class="foot">
+        <div><span>${over ? 'Acima do orçamento' : bud > 0 ? 'Ainda pode gastar por dia' : 'Receitas do mês'}</span><strong>${over ? '+' + eur(spent - bud) : bud > 0 ? eur(perDay) : eur0(t.Receita)}</strong></div>
+        <div><span>Face a ${esc(new Intl.DateTimeFormat('pt-PT', { month: 'long' }).format(parseD(prevKey + '-01')))}</span><strong>${isFinite(diff) ? (diff > 0 ? '▲ ' : '▼ ') + pct(Math.abs(diff)) : '–'}</strong></div>
+      </div>
+    </section>
+    <div class="qa">
+      <button class="main" data-act="quick" data-v="Despesa">${ic.plus}<span>Despesa</span></button>
+      <button data-act="quick" data-v="Receita"><span class="dot" style="background:var(--good-soft);color:var(--good)">${ic.in}</span>Receita</button>
+      <button data-act="quick" data-v="Poupança"><span class="dot" style="background:var(--accent-soft);color:var(--accent)">${ic.save}</span>Poupança</button>
+      <button data-act="quick" data-v="Conta fixa"><span class="dot" style="background:var(--warn-soft);color:var(--warn)">${ic.fix}</span>Fixa</button>
+    </div>
+    <div class="mini">
+      <div class="card"><div class="label">Hoje</div><div class="v">${eur(todayV)}</div><div class="h">${todayN ? todayN + ' movimento' + (todayN > 1 ? 's' : '') : 'Nada registado'}</div></div>
+      <div class="card"><div class="label">Últimos 7 dias</div><div class="v">${eur(weekV)}</div><div class="h">média ${eur(weekV / 7)}/dia</div></div>
+    </div>
+    <section class="card"><div class="cardhead"><h2>Para onde vai o dinheiro</h2><button class="btn ghost small" data-act="goto" data-v="mes">Ver mês</button></div>
+      ${top.length ? `<div class="where">${top.map(([c, v], i) => `<div><div class="top"><span><i class="sw" style="background:${colors[i]}"></i>${esc(c)}</span><span class="num">${eur(v)}</span></div><div class="track"><i style="width:${(v / topMax * 100).toFixed(1)}%;background:${colors[i]}"></i></div></div>`).join('')}</div>` : '<p class="empty">Ainda sem despesas este mês.</p>'}
+    </section>
+    <section class="card"><div class="cardhead"><h2>Últimos movimentos</h2><button class="btn ghost small" data-act="goto" data-v="registar">Ver todos</button></div>
+      <div class="list">${recent.map(x => rowTx(x)).join('') || '<p class="empty">Ainda não registou nenhum movimento.</p>'}</div>
+    </section>
+    <button class="card patri" data-act="goto" data-v="patrimonio"><div><div class="label">Património</div><div class="v">${eur(net)}</div>
+      <div class="small muted">${juroMes > 0 ? `As suas contas rendem cerca de ${eur(juroMes)} por mês` : 'Contas, poupanças e ETFs'}</div></div>${ic.chev}</button>
+  </div>`;
+}
 function viewRegistar() {
   syncSplit();
   const key = monthKey(today());
@@ -415,7 +517,6 @@ function viewRegistar() {
   const typesShown = TYPES.filter(tp => tp !== 'Dívida' || S.cats.some(c => c.type === 'Dívida' && freq[c.name]));
   return `
   <header class="top"><h1>${F.editing ? 'Editar movimento' : 'Registar'}</h1><span class="sub">${esc(dayLong(today()))}</span></header>
-  ${!allTx().length ? welcomeCard() : ''}
   ${host.kind === 'app' && allTx().length && (!S.settings.lastBackup || (parseD(today()) - parseD(S.settings.lastBackup)) / 864e5 > 30) ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${S.settings.lastBackup ? 'Já passou mais de um mês desde a última cópia de segurança.' : 'Ainda não fez nenhuma cópia de segurança dos seus dados.'}</span><button class="btn small" data-act="backup">Fazer agora</button></div>` : ''}
   <div class="grid2">
   <div class="stack">
@@ -718,7 +819,7 @@ function viewAjustes() {
   };
   const s = S.settings;
   return `
-  <header class="top"><h1>Ajustes</h1></header>
+  <header class="top"><h1>Ajustes</h1><button class="btn ghost small" data-act="goto" data-v="inicio">‹ Início</button></header>
   <div class="stack">
     <form class="card stack" id="cat-add" autocomplete="off"><h2>Nova categoria</h2>
       <div class="row2"><div class="field"><label class="small" for="nc-name">Nome</label><input id="nc-name" placeholder="ex.: Animais"></div>
@@ -727,6 +828,7 @@ function viewAjustes() {
     <div class="grid2">${['Despesa', 'Conta fixa'].map(block).join('')}</div>
     <div class="grid2">${['Receita', 'Poupança'].map(block).join('')}${block('Dívida')}
       <section class="card stack"><h2>Parâmetros</h2>
+        <div class="field"><label class="small" for="set-name">O seu nome (aparece na saudação do Início)</label><input id="set-name" class="inp" autocomplete="given-name" maxlength="30" value="${esc(s.name || '')}" placeholder="ex.: Ana"></div>
         <div class="row2"><div class="field"><label class="small" for="set-infl">Inflação anual esperada (%)</label><input id="set-infl" class="inp" inputmode="decimal" value="${esc(String(+(s.inflation * 100).toFixed(2)).replace('.', ','))}"></div>
         <div class="field"><label class="small" for="set-irs">IRS sobre juros (%)</label><input id="set-irs" class="inp" inputmode="decimal" value="${esc(String(+(s.irs * 100).toFixed(2)).replace('.', ','))}"></div></div>
         <p class="small muted">A inflação de 2% é o objetivo do BCE; atualize com a previsão mais recente do Banco de Portugal. Os juros de depósitos em Portugal têm retenção de 28%.</p>
@@ -744,7 +846,7 @@ function restoreBlock() {
 }
 function welcomeCard() {
   return `<section class="card stack"><h2>Bem-vindo ao Livro de Contas</h2>
-    <p class="small">Registe a primeira despesa aqui em baixo. Já tem categorias base criadas; pode mudá-las, apagá-las ou definir orçamentos em Ajustes.</p>
+    <p class="small">Toque em <b>Despesa</b> para registar a primeira. Já tem categorias base criadas; pode mudá-las, apagá-las ou definir orçamentos em Ajustes.</p>
     <p class="small muted">Já tem dados de outro telemóvel ou da página Livro de Contas? Importe a cópia de segurança (ficheiro .json) e continua com todo o histórico.</p>
     ${restoreBlock()}</section>`;
 }
@@ -805,13 +907,14 @@ async function doRestore() {
 
 // ---------- render ----------
 const ICONS = {
+  inicio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5"/></svg>',
   registar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
   mes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
   ano: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20v-9M20 20V4"/></svg>',
   patrimonio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/></svg>',
   ajustes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
 };
-const TABS = [['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património'], ['ajustes', 'Ajustes']];
+const TABS = [['inicio', 'Início'], ['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património']];
 function renderTabs() {
   document.getElementById('tabs').innerHTML = TABS.map(([k, l]) => `<button type="button" data-tab="${k}" ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
 }
@@ -819,7 +922,7 @@ function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
   const a = document.activeElement, aid = a && a.id, sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
   const html = (S.dbState === 'off' ? '<div class="banner">' + offMsg() + '</div>' : '') +
-    ({ registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
+    ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
   document.getElementById('app').innerHTML = html;
   renderTabs();
   if (aid) { const el = document.getElementById(aid); if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
@@ -832,6 +935,8 @@ const app = document.getElementById('app');
 app.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, v = b.dataset.v;
+  if (act === 'goto') { go(v); return; }
+  if (act === 'quick') { resetForm(); F.type = v; go('registar'); const el = document.getElementById('f-amount'); if (el) el.focus(); return; }
   if (act === 'type') { F.type = v; if (catType(F.cat) !== v) F.cat = ''; render(); }
   else if (act === 'cat') { F.cat = F.cat === v ? '' : v; render(); }
   else if (act === 'date') { F.date = v; render(); }
@@ -880,6 +985,7 @@ app.addEventListener('change', e => {
   const t = e.target, id = t.id;
   if (id === 'f-date') { if (t.value) { F.date = t.value; render(); } }
   else if (id === 'next-contrib') { const v = parseAmount(t.value); if (v >= 0) { S.settings.nextContribution = v; saveSettings(); render(); } }
+  else if (id === 'set-name') { S.settings.name = t.value.trim(); saveSettings(); }
   else if (id === 'set-infl' || id === 'set-irs') { const v = parseAmount(t.value); if (v >= 0) { S.settings[id === 'set-infl' ? 'inflation' : 'irs'] = v / 100; saveSettings(); render(); } }
   else if (id === 'nc-type') UI.addCatType = t.value;
   else if (id === 'restore-file') { if (t.files && t.files[0]) readRestoreFile(t.files[0]); }
@@ -1053,7 +1159,7 @@ async function exportXlsx() {
 }
 
 // ---------- boot ----------
-try { const v = localStorage.getItem('ldc-view'); if (v && TABS.some(t => t[0] === v)) view = v; } catch (e) {}
+
 renderTabs();
 (async () => {
   if (window.LDC) {
