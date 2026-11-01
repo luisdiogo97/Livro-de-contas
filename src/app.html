@@ -251,7 +251,7 @@ let view = 'inicio';
 let curMonth = monthKey(today());
 let yearSel = 'last12';
 const F = { type: 'Despesa', amount: '', cat: '', date: today(), note: '', editing: null, confirmDel: false };
-const UI = { openAcc: null, confirmAcc: null, showAllRecent: false, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
+const UI = { openAcc: null, confirmAcc: null, recentMonths: 0, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
 let db = null, host = { kind: 'none', saveFile: null };
 const offMsg = () => host.kind === 'app' ? 'Não foi possível abrir os dados guardados neste telemóvel. Feche e volte a abrir a app.' : 'Sem ligação aos dados guardados. Abra esta página com a sua conta claude.ai para ver e registar movimentos.';
 
@@ -453,7 +453,18 @@ function viewRegistar() {
   const amt = parseAmount(F.amount);
   const canSave = amt > 0 && F.cat && F.date;
   const yest = isoOf(new Date(Date.now() - 864e5));
-  const recent = allTx().slice().sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id)).slice(0, UI.showAllRecent ? 30 : 8);
+  const sorted = allTx().slice().sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id));
+  // Collapsed: the 8 latest. Expanded: every entry from the start of the month N-1 months back (default: this month and the previous one).
+  const fromKey = UI.recentMonths ? addMonths(key, 1 - UI.recentMonths) : null;
+  const recent = fromKey ? sorted.filter(x => monthKey(x.d) >= fromKey) : sorted.slice(0, 8);
+  const hasOlder = fromKey ? sorted.some(x => monthKey(x.d) < fromKey) : sorted.length > 8;
+  const recentList = () => {
+    if (!fromKey) return recent.map(x => rowTx(x)).join('') || '<p class="empty">Ainda sem movimentos.</p>';
+    const by = {}; for (const x of recent) (by[monthKey(x.d)] = by[monthKey(x.d)] || []).push(x);
+    const ks = Array.from({ length: UI.recentMonths }, (_, i) => addMonths(key, -i));
+    for (const k of Object.keys(by)) if (!ks.includes(k)) ks.unshift(k); // future-dated entries
+    return ks.map(k => `<div class="dayhead" style="text-transform:none">${esc(monthLong(k).replace(/^./, c => c.toUpperCase()))} · ${(by[k] || []).length} ${(by[k] || []).length === 1 ? 'movimento' : 'movimentos'}</div>${(by[k] || []).map(x => rowTx(x)).join('') || '<p class="empty">Sem movimentos neste mês.</p>'}`).join('');
+  };
   const typesShown = TYPES.filter(tp => tp !== 'Dívida' || S.cats.some(c => c.type === 'Dívida' && freq[c.name]));
   return `
   <header class="top"><h1>${F.editing ? 'Editar movimento' : 'Registar'}</h1><span class="sub">${esc(dayLong(today()))}</span></header>
@@ -488,8 +499,11 @@ function viewRegistar() {
     </section>
     <section class="card">
       <h2>Últimos movimentos</h2>
-      <div class="list">${recent.map(x => rowTx(x)).join('') || '<p class="empty">Ainda sem movimentos.</p>'}</div>
-      <button class="btn ghost small" data-act="more-recent">${UI.showAllRecent ? 'Mostrar menos' : 'Mostrar mais'}</button>
+      <div class="list">${recentList()}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        ${UI.recentMonths ? `<button class="btn ghost small" data-act="less-recent">Mostrar menos</button>` : ''}
+        ${!UI.recentMonths ? (hasOlder ? `<button class="btn ghost small" data-act="more-recent">Ver este mês e o anterior</button>` : '') : (hasOlder ? `<button class="btn ghost small" data-act="more-recent">Mostrar mais um mês</button>` : '')}
+      </div>
     </section>
   </div></div>`;
 }
@@ -879,7 +893,8 @@ app.addEventListener('click', e => {
   if (act === 'type') { F.type = v; if (catType(F.cat) !== v) F.cat = ''; render(); }
   else if (act === 'cat') { F.cat = F.cat === v ? '' : v; render(); }
   else if (act === 'date') { F.date = v; render(); }
-  else if (act === 'more-recent') { UI.showAllRecent = !UI.showAllRecent; render(); }
+  else if (act === 'more-recent') { UI.recentMonths = UI.recentMonths ? UI.recentMonths + 1 : 2; render(); }
+  else if (act === 'less-recent') { UI.recentMonths = 0; render(); }
   else if (act === 'edit') { const t = findTx(b.dataset.id); if (!t) return; Object.assign(F, { editing: t.id, type: catType(t.c), amount: String(t.v).replace('.', ','), cat: t.c, date: t.d, note: t.n || '', confirmDel: false }); go('registar'); }
   else if (act === 'cancel-edit') { resetForm(); render(); }
   else if (act === 'del-edit') {
