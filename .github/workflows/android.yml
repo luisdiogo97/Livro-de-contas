@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# A newer push cancels an older build still running, so the newest version is always
+# the one published last (and shown as "Latest" on the Releases page).
+concurrency:
+  group: android-release
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -77,6 +83,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.${{ github.run_number }}" "$RUNNER_TEMP"/livro-de-contas-*.apk \
+          gh release create "v1.${{ github.run_number }}" --latest "$RUNNER_TEMP"/livro-de-contas-*.apk \
             --title "Livro de Contas 1.${{ github.run_number }}" \
             --notes "APK assinado, gerado a partir de ${{ github.sha }}."
