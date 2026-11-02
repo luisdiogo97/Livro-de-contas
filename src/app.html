@@ -251,6 +251,15 @@ const KINDS = ['ETF', 'Ação', 'Cripto', 'PPR', 'Outro'];
 const KIND_PL = { ETF: 'ETFs', 'Ação': 'Ações', Cripto: 'Cripto', PPR: 'PPR', Outro: 'Outros' };
 const KIND_COLOR = { ETF: 'var(--s1)', 'Ação': 'var(--s2)', Cripto: '#8b5cf6', PPR: 'var(--s3)', Outro: 'var(--muted)' };
 const kindOf = e => KINDS.includes(e.kind) ? e.kind : 'ETF';
+// Per-type wording and the rate each type tracks (fee for most, dividend yield for shares).
+const KIND_INFO = {
+  ETF: { title: 'ETFs', add: '+ Adicionar ETF', empty: 'Ainda não tem ETFs.', key: 'ex.: World', name: 'ex.: iShares Core MSCI World', fee: 'Custo anual, TER (%)', feeShort: 'TER', feePh: '0,2', field: 'ter' },
+  'Ação': { title: 'Ações', add: '+ Adicionar ação', empty: 'Ainda não tem ações.', key: 'ex.: Apple', name: 'ex.: Apple Inc. (AAPL)', fee: 'Dividendos por ano (%)', feeShort: 'dividendos', feePh: '0,5', field: 'div' },
+  Cripto: { title: 'Cripto', add: '+ Adicionar cripto', empty: 'Ainda não tem cripto.', key: 'ex.: Bitcoin', name: 'ex.: BTC na Binance', fee: 'Comissão anual da plataforma (%)', feeShort: 'comissão', feePh: '0', field: 'ter' },
+  PPR: { title: 'PPR', add: '+ Adicionar PPR', empty: 'Ainda não tem PPR.', key: 'ex.: PPR Save & Grow', name: 'ex.: nome da entidade gestora', fee: 'Comissão de gestão anual (%)', feeShort: 'comissão de gestão', feePh: '1,5', field: 'ter' },
+  Outro: { title: 'Outros investimentos', add: '+ Adicionar investimento', empty: 'Fundos, obrigações, certificados de aforro ou outros.', key: 'ex.: Certificados de Aforro', name: 'ex.: série F', fee: 'Custo anual (%)', feeShort: 'custo', feePh: '0,5', field: 'ter' },
+};
+const nextFor = k => { const n = (S.settings.next || {})[k]; return n != null ? +n || 0 : k === 'ETF' ? +S.settings.nextContribution || 0 : 0; };
 const WEEK = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 // ---------- state ----------
@@ -637,9 +646,10 @@ function accCalc(a) {
   const year = (+a.balance || 0) * eff;
   return { tanl, eff, year, month: year / 12, real: (1 + eff) / (1 + S.settings.inflation) - 1 };
 }
-function etfCalc() {
-  const snaps = S.etfs.snaps || [];
-  const rows = (S.etfs.etfs || []).map(e => {
+function etfCalc(kind) {
+  const all = S.etfs.etfs || [], defs = kind ? all.filter(e => kindOf(e) === kind) : all;
+  const keys = new Set(defs.map(e => e.key)), snaps = (S.etfs.snaps || []).filter(x => keys.has(x.e));
+  const rows = defs.map(e => {
     const mine = snaps.filter(s => s.e === e.key).sort((a, b) => a.d.localeCompare(b.d));
     const inv = mine.reduce((s, x) => s + (+x.inv || 0), 0);
     const last = mine[mine.length - 1];
@@ -650,11 +660,13 @@ function etfCalc() {
     return { ...e, inv, val, gain, g, ann, lastD: last ? last.d : null };
   });
   const totV = rows.reduce((s, r) => s + r.val, 0), totI = rows.reduce((s, r) => s + r.inv, 0);
-  const next = +S.settings.nextContribution || 0;
-  // Weights and target weights are measured within each type (ETFs against ETFs, cripto against cripto...).
+  // Weights, target weights and the next top-up are measured within each type.
   const kTot = {}; for (const r of rows) kTot[kindOf(r)] = (kTot[kindOf(r)] || 0) + r.val;
-  const need = rows.map(r => Math.max(0, (r.target || 0) * (kTot[kindOf(r)] + next) - r.val)), needSum = need.reduce((a, b) => a + b, 0);
-  rows.forEach((r, i) => { const kt = kTot[kindOf(r)]; r.w = kt ? r.val / kt : 0; r.sug = needSum ? next * need[i] / needSum : 0; });
+  for (const k of KINDS) {
+    const rs = rows.filter(r => kindOf(r) === k), next = nextFor(k);
+    const need = rs.map(r => Math.max(0, (r.target || 0) * (kTot[k] + next) - r.val)), needSum = need.reduce((a, b) => a + b, 0);
+    rs.forEach((r, i) => { r.w = kTot[k] ? r.val / kTot[k] : 0; r.sug = needSum ? next * need[i] / needSum : 0; });
+  }
   // evolution: per unique date, sum of last known values / cumulative invested
   const dates = [...new Set(snaps.map(s => s.d))].sort();
   const evo = dates.map(d => {
@@ -662,7 +674,7 @@ function etfCalc() {
     for (const e of rows) { const m = snaps.filter(s => s.e === e.key && s.d <= d); if (m.length) { v += +m.sort((a, b) => a.d.localeCompare(b.d))[m.length - 1].val; iv += m.reduce((s, x) => s + (+x.inv || 0), 0); } }
     return { d, v, iv };
   });
-  return { rows, totV, totI, evo };
+  return { rows, totV, totI, evo, snaps };
 }
 function viewPatrimonio() {
   const accs = S.accounts.accounts || [];
@@ -704,28 +716,14 @@ function viewPatrimonio() {
         ${!accs.length ? '' : hist.length > 1 ? `<div class="chart" style="margin-top:14px"><div class="label" style="margin-bottom:4px">Evolução do total em contas</div>${lineChart({ labels: hist.map(h => dayShort(h.d)), series: [{ color: 'var(--s3)', values: hist.map(h => h.total), area: true }], tips: hist.map(h => `${dayShort(h.d)}: ${eur(h.total)}`), h: 150 })}</div>` : '<p class="small muted" style="margin-top:12px">Sempre que atualizar um saldo, o total fica registado e aparece aqui um gráfico da evolução.</p>'}
       </section>
       <section class="card"><h2>Investimentos</h2>
-        ${!E.rows.length ? `<p class="empty">Ainda não tem investimentos. Adicione ETFs, ações, cripto ou PPR para acompanhar o valor, o ganho e a repartição de cada reforço.</p>${UI.etfOpen === 'new' ? etfEdit(null) : '<div><button class="btn small" data-act="etf-add">+ Adicionar investimento</button></div>'}` : `
-        <div class="kpis" style="margin-bottom:6px">
+        ${E.rows.length ? `<div class="kpis" style="margin-bottom:6px">
           <div class="kpi"><div class="label">Valor</div><div class="v">${eur0(E.totV)}</div><div class="h">Investido ${eur0(E.totI)}</div></div>
           <div class="kpi"><div class="label">Ganho</div><div class="v" style="color:${E.totV - E.totI < 0 ? 'var(--bad)' : 'var(--good)'}">${eur0(E.totV - E.totI)}</div><div class="h">${pct(E.totI ? (E.totV - E.totI) / E.totI : NaN)}</div></div>
-        </div>
-        ${allocBar(E)}
-        ${invGroups(E.rows, r => `<div class="bud"><div class="top"><b>${esc(r.key)}</b><span class="num">${eur(r.val)} <span class="${r.gain < 0 ? '' : ''}" style="color:${r.gain < 0 ? 'var(--bad)' : 'var(--good)'}">${isFinite(r.g) ? (r.gain >= 0 ? '+' : '') + pct(r.g) : ''}</span></span></div>
-          <div class="small muted">${[esc(r.name), r.ter ? 'custo ' + pct2(r.ter) + '/ano' : '', isFinite(r.ann) ? pct(r.ann) + '/ano (aprox.)' : ''].filter(Boolean).join(' · ')}</div>
-          ${r.w > 0.999 && !r.target ? '' : `<div class="track" data-tip="${esc(`Peso ${pct(r.w)} · alvo ${pct(r.target)}`)}"><i style="width:${(r.w * 100).toFixed(1)}%;background:${KIND_COLOR[kindOf(r)]}"></i></div>
-          <div class="small"><span class="muted">Peso ${pct(r.w)}${r.target ? ' · alvo ' + pct(r.target) : ''}</span>${r.sug >= 0.5 ? ` · <b>próximo reforço: ${eur0(r.sug)}</b>` : ''}</div>`}
-          ${UI.etfOpen === r.key ? etfEdit(r) : `<div><button class="btn ghost small" data-act="etf-open" data-key="${esc(r.key)}">Editar</button></div>`}</div>`)}
-        ${UI.etfOpen === 'new' ? etfEdit(null) : '<div style="margin-top:10px"><button class="btn small" data-act="etf-add">+ Adicionar investimento</button></div>'}
-        <div class="field" style="margin-top:12px"><label class="label" for="next-contrib">Próximo reforço (para calcular a repartição)</label><input id="next-contrib" inputmode="decimal" class="inp" value="${esc(String(S.settings.nextContribution ?? ''))}"></div>
-        ${E.evo.length > 1 ? `<div class="chart" style="margin-top:14px">${legend([['Valor', 'var(--s1)'], ['Investido', 'var(--s2)']])}${lineChart({ labels: E.evo.map(x => monthShort(x.d.slice(0, 7))), series: [{ color: 'var(--s1)', values: E.evo.map(x => x.v), area: true }, { color: 'var(--s2)', values: E.evo.map(x => x.iv) }], tips: E.evo.map(x => `${dayShort(x.d)} ${x.d.slice(0, 4)}\nValor: ${eur(x.v)}\nInvestido: ${eur(x.iv)}\nGanho: ${eur(x.v - x.iv)}`), h: 180 })}</div>` : ''}
-        <form class="edit" id="etf-form" style="margin-top:14px" autocomplete="off">
-          <div class="label">Atualizar valores (uma vez por mês)</div>
-          <div class="field"><label class="small" for="etf-date">Data</label><input type="date" id="etf-date" value="${today()}"></div>
-          ${E.rows.map(r => `<div class="row2"><div class="field"><label class="small" for="etf-inv-${esc(r.key)}">${esc(r.key)}: investi hoje</label><input id="etf-inv-${esc(r.key)}" inputmode="decimal" placeholder="0"></div><div class="field"><label class="small" for="etf-val-${esc(r.key)}">valor atual</label><input id="etf-val-${esc(r.key)}" inputmode="decimal" placeholder="${esc(String(r.val.toFixed(2)).replace('.', ','))}"></div></div>`).join('')}
-          <button class="btn" type="submit">Guardar valores</button>
-        </form>`}
+        </div>${allocBar(E)}` : '<p class="empty">Ainda não tem investimentos. Use as zonas abaixo para adicionar ETFs, ações, cripto, PPR ou outros.</p>'}
+        ${E.evo.length > 1 && new Set(E.rows.filter(r => r.val > 0).map(kindOf)).size > 1 ? `<div class="chart" style="margin-top:14px"><div class="label" style="margin-bottom:4px">Evolução de todos os investimentos</div>${legend([['Valor', 'var(--s1)'], ['Investido', 'var(--s2)']])}${lineChart({ labels: E.evo.map(x => monthShort(x.d.slice(0, 7))), series: [{ color: 'var(--s1)', values: E.evo.map(x => x.v), area: true }, { color: 'var(--s2)', values: E.evo.map(x => x.iv) }], tips: E.evo.map(x => `${dayShort(x.d)} ${x.d.slice(0, 4)}\nValor: ${eur(x.v)}\nInvestido: ${eur(x.iv)}\nGanho: ${eur(x.v - x.iv)}`), h: 170 })}</div>` : ''}
       </section>
     </div>
+    <div class="grid2">${KINDS.map(invCard).join('')}</div>
   </div>`;
 }
 function allocBar(E) {
@@ -735,25 +733,53 @@ function allocBar(E) {
   return `<div class="label" style="margin-top:6px">Repartição</div><div class="alloc" role="img" aria-label="${esc(ks.map(k => KIND_PL[k] + ' ' + pct(by[k] / E.totV)).join(', '))}">${ks.map(k => `<i style="width:${(by[k] / E.totV * 100).toFixed(2)}%;background:${KIND_COLOR[k]}"></i>`).join('')}</div>
     <div class="legend">${ks.map(k => `<span><i style="background:${KIND_COLOR[k]}"></i>${KIND_PL[k]} ${pct(by[k] / E.totV)}</span>`).join('')}</div>`;
 }
-function invGroups(rows, rowHtml) {
-  const ks = KINDS.filter(k => rows.some(r => kindOf(r) === k));
-  if (ks.length < 2 && ks[0] !== 'PPR') return rows.map(rowHtml).join('');
-  return ks.map(k => {
-    const rs = rows.filter(r => kindOf(r) === k), v = rs.reduce((a, r) => a + r.val, 0), i = rs.reduce((a, r) => a + r.inv, 0);
-    return `<div class="grp"><b><i class="sw" style="width:10px;height:10px;border-radius:3px;background:${KIND_COLOR[k]}"></i>${KIND_PL[k]}</b><span class="num small">${eur0(v)}${i ? ` <span style="color:${v - i < 0 ? 'var(--bad)' : 'var(--good)'}">${v - i >= 0 ? '+' : ''}${pct((v - i) / i)}</span>` : ''}</span></div>`
-      + (k === 'PPR' ? '<p class="small muted" style="margin:6px 0 0">No IRS pode deduzir 20% do que coloca em PPR no ano: até 400 € com menos de 35 anos, 350 € dos 35 aos 50 e 300 € a partir dos 50.</p>' : '')
-      + rs.map(rowHtml).join('');
-  }).join('');
+function invRow(r) {
+  const I = KIND_INFO[kindOf(r)], rate = +r[I.field] || 0, color = KIND_COLOR[kindOf(r)];
+  const showW = !(r.w > 0.999 && !r.target);
+  return `<div class="bud"><div class="top"><b>${esc(r.key)}</b><span class="num">${eur(r.val)} <span style="color:${r.gain < 0 ? 'var(--bad)' : 'var(--good)'}">${isFinite(r.g) ? (r.gain >= 0 ? '+' : '') + pct(r.g) : ''}</span></span></div>
+    <div class="small muted">${[esc(r.name), rate ? I.feeShort + ' ' + pct2(rate) + '/ano' : '', r.inv ? 'investido ' + eur0(r.inv) : '', isFinite(r.ann) ? pct(r.ann) + '/ano (aprox.)' : ''].filter(Boolean).join(' · ')}</div>
+    ${showW ? `<div class="track" data-tip="${esc(`Peso ${pct(r.w)} · alvo ${pct(r.target)}`)}"><i style="width:${(r.w * 100).toFixed(1)}%;background:${color}"></i></div>
+    <div class="small"><span class="muted">Peso ${pct(r.w)}${r.target ? ' · alvo ' + pct(r.target) : ''}</span>${r.sug >= 0.5 ? ` · <b>próximo reforço: ${eur0(r.sug)}</b>` : ''}</div>` : ''}
+    ${UI.etfOpen === r.key ? etfEdit(r) : `<div><button class="btn ghost small" data-act="etf-open" data-key="${esc(r.key)}">Editar nome, taxas ou peso</button></div>`}</div>`;
 }
-function etfEdit(r) {
-  const t = r || { key: '', name: '', ter: 0, target: 0, kind: 'ETF' };
+function invCard(kind) {
+  const E = etfCalc(kind), I = KIND_INFO[kind], color = KIND_COLOR[kind], k = esc(kind);
+  const addBtn = UI.etfOpen === 'new:' + kind ? etfEdit(null, kind) : `<div style="margin-top:10px"><button class="btn small" data-act="etf-add" data-kind="${k}">${I.add}</button></div>`;
+  let ppr = '';
+  if (kind === 'PPR') {
+    const y = today().slice(0, 4), putIn = E.snaps.filter(x => x.d.startsWith(y)).reduce((a, x) => a + (+x.inv || 0), 0);
+    ppr = `<p class="small" style="background:var(--good-soft);padding:10px 12px;border-radius:10px;margin:8px 0 0">No IRS pode deduzir <b>20%</b> do que coloca em PPR em cada ano, até 400 € com menos de 35 anos, 350 € dos 35 aos 50 e 300 € a partir dos 50.${putIn ? ` Em ${y} já colocou <b>${eur0(putIn)}</b>, o que dá até <b>${eur0(Math.min(putIn * 0.2, 400))}</b> de dedução.` : ''}</p>`;
+  }
+  if (!E.rows.length) return `<section class="card"><h2 style="display:flex;align-items:center;gap:8px"><i class="sw" style="width:12px;height:12px;border-radius:4px;background:${color}"></i>${I.title}</h2>
+    <p class="empty">${I.empty}</p>${ppr}${addBtn}</section>`;
+  const gain = E.totV - E.totI, many = E.rows.length > 1;
+  return `<section class="card"><h2 style="display:flex;align-items:center;gap:8px"><i class="sw" style="width:12px;height:12px;border-radius:4px;background:${color}"></i>${I.title}</h2>
+    <div class="kpis" style="margin-bottom:6px">
+      <div class="kpi"><div class="label">Valor</div><div class="v">${eur0(E.totV)}</div><div class="h">Investido ${eur0(E.totI)}</div></div>
+      <div class="kpi"><div class="label">Ganho</div><div class="v" style="color:${gain < 0 ? 'var(--bad)' : 'var(--good)'}">${eur0(gain)}</div><div class="h">${pct(E.totI ? gain / E.totI : NaN)}</div></div>
+    </div>
+    ${ppr}
+    ${E.rows.map(invRow).join('')}
+    ${addBtn}
+    ${many || E.rows.some(r => r.target) ? `<div class="field" style="margin-top:12px"><label class="label" for="next-${k}">Próximo reforço em ${I.title} (para calcular a repartição)</label><input id="next-${k}" data-next="${k}" inputmode="decimal" class="inp" value="${esc(String(nextFor(kind) || '').replace('.', ','))}" placeholder="0"></div>` : ''}
+    ${E.evo.length > 1 ? `<div class="chart" style="margin-top:14px">${legend([['Valor', color], ['Investido', 'var(--muted)']])}${lineChart({ labels: E.evo.map(x => monthShort(x.d.slice(0, 7))), series: [{ color, values: E.evo.map(x => x.v), area: true }, { color: 'var(--muted)', values: E.evo.map(x => x.iv) }], tips: E.evo.map(x => `${dayShort(x.d)} ${x.d.slice(0, 4)}\nValor: ${eur(x.v)}\nInvestido: ${eur(x.iv)}\nGanho: ${eur(x.v - x.iv)}`), h: 160 })}</div>` : ''}
+    <form class="edit inv-form" data-kind="${k}" style="margin-top:14px" autocomplete="off">
+      <div class="label">Atualizar valores de ${I.title}</div>
+      <div class="field"><label class="small" for="inv-date-${k}">Data</label><input type="date" id="inv-date-${k}" value="${today()}"></div>
+      ${E.rows.map(r => `<div class="row2"><div class="field"><label class="small" for="etf-inv-${esc(r.key)}">${esc(r.key)}: investi hoje</label><input id="etf-inv-${esc(r.key)}" inputmode="decimal" placeholder="0"></div><div class="field"><label class="small" for="etf-val-${esc(r.key)}">valor atual</label><input id="etf-val-${esc(r.key)}" inputmode="decimal" placeholder="${esc(String(r.val.toFixed(2)).replace('.', ','))}"></div></div>`).join('')}
+      <button class="btn" type="submit">Guardar valores</button>
+    </form></section>`;
+}
+function etfEdit(r, kind) {
+  const t = r || { key: '', name: '', ter: 0, div: 0, target: 0, kind };
+  const kd = kindOf(t), I = KIND_INFO[kd];
   const num = v => v ? esc(String(+(v * 100).toFixed(3)).replace('.', ',')) : '';
   return `<form class="edit" id="etf-def" data-key="${esc(t.key)}" autocomplete="off">
-    <div class="field"><label class="small" for="etfd-kind">Tipo</label><select id="etfd-kind">${KINDS.map(k => `<option value="${k}" ${kindOf(t) === k ? 'selected' : ''}>${k === 'Outro' ? 'Outro (fundos, obrigações…)' : k}</option>`).join('')}</select></div>
-    <div class="row2"><div class="field"><label class="small" for="etfd-key">Nome curto</label><input id="etfd-key" value="${esc(t.key)}" placeholder="ex.: World, Apple, Bitcoin"></div>
-    <div class="field"><label class="small" for="etfd-name">Nome completo (opcional)</label><input id="etfd-name" value="${esc(t.name)}" placeholder="ex.: iShares Core MSCI World"></div></div>
-    <div class="row2"><div class="field"><label class="small" for="etfd-ter">Custo anual (%), opcional</label><input id="etfd-ter" inputmode="decimal" value="${num(t.ter)}" placeholder="0,2"></div>
-    <div class="field"><label class="small" for="etfd-target">Peso alvo dentro do tipo (%), opcional</label><input id="etfd-target" inputmode="decimal" value="${num(t.target)}" placeholder="60"></div></div>
+    <div class="row2"><div class="field"><label class="small" for="etfd-key">Nome curto</label><input id="etfd-key" value="${esc(t.key)}" placeholder="${esc(I.key)}"></div>
+    <div class="field"><label class="small" for="etfd-name">Descrição (opcional)</label><input id="etfd-name" value="${esc(t.name)}" placeholder="${esc(I.name)}"></div></div>
+    <div class="row2"><div class="field"><label class="small" for="etfd-fee">${I.fee}, opcional</label><input id="etfd-fee" inputmode="decimal" value="${num(t[I.field])}" placeholder="${I.feePh}"></div>
+    <div class="field"><label class="small" for="etfd-target">Peso alvo em ${I.title} (%), opcional</label><input id="etfd-target" inputmode="decimal" value="${num(t.target)}" placeholder="ex.: 50"></div></div>
+    ${r ? `<div class="field"><label class="small" for="etfd-kind">Tipo</label><select id="etfd-kind">${KINDS.map(x => `<option value="${x}" ${kd === x ? 'selected' : ''}>${KIND_INFO[x].title}</option>`).join('')}</select></div>` : `<input type="hidden" id="etfd-kind" value="${esc(kd)}">`}
     <div class="row2"><button class="btn" type="submit">${r ? 'Guardar' : 'Adicionar'}</button><button class="btn" type="button" data-act="etf-close">Cancelar</button></div>
     ${r ? `<button class="btn danger small" type="button" data-act="etf-del" data-key="${esc(r.key)}">${UI.confirmEtf ? 'Confirmar: remover e apagar os seus registos' : 'Remover'}</button>` : ''}
   </form>`;
@@ -921,7 +947,7 @@ app.addEventListener('click', e => {
   else if (act === 'year') { yearSel = v; render(); }
   else if (act === 'acc-open') { UI.openAcc = b.dataset.id; UI.confirmAcc = null; render(); }
   else if (act === 'acc-close') { UI.openAcc = null; render(); }
-  else if (act === 'etf-add') { UI.etfOpen = 'new'; UI.confirmEtf = false; render(); const el = document.getElementById('etfd-key'); if (el) el.focus(); }
+  else if (act === 'etf-add') { UI.etfOpen = 'new:' + b.dataset.kind; UI.confirmEtf = false; render(); const el = document.getElementById('etfd-key'); if (el) el.focus(); }
   else if (act === 'etf-open') { UI.etfOpen = b.dataset.key; UI.confirmEtf = false; render(); }
   else if (act === 'etf-close') { UI.etfOpen = null; UI.confirmEtf = false; render(); }
   else if (act === 'etf-del') {
@@ -948,7 +974,7 @@ app.addEventListener('input', e => {
 app.addEventListener('change', e => {
   const t = e.target, id = t.id;
   if (id === 'f-date') { if (t.value) { F.date = t.value; render(); } }
-  else if (id === 'next-contrib') { const v = parseAmount(t.value); if (v >= 0) { S.settings.nextContribution = v; saveSettings(); render(); } }
+  else if (t.dataset.next) { const v = t.value.trim() ? parseAmount(t.value) : 0; if (v >= 0) { S.settings.next = { ...(S.settings.next || {}), [t.dataset.next]: v }; if (t.dataset.next === 'ETF') S.settings.nextContribution = v; saveSettings(); render(); } }
   else if (id === 'set-name') { S.settings.name = t.value.trim(); saveSettings(); }
   else if (id === 'set-infl' || id === 'set-irs') { const v = parseAmount(t.value); if (v >= 0) { S.settings[id === 'set-infl' ? 'inflation' : 'irs'] = v / 100; saveSettings(); render(); } }
   else if (id === 'nc-type') UI.addCatType = t.value;
@@ -993,20 +1019,22 @@ app.addEventListener('submit', e => {
     UI.openAcc = null; recordHistory(); saveAccounts(); render(); toast('Conta atualizada');
   } else if (f.id === 'etf-def') {
     const old = f.dataset.key, g = id => document.getElementById(id).value.trim();
-    const key = g('etfd-key'), ter = g('etfd-ter') ? parseAmount(g('etfd-ter')) : 0, target = g('etfd-target') ? parseAmount(g('etfd-target')) : 0;
+    const key = g('etfd-key'), ter = g('etfd-fee') ? parseAmount(g('etfd-fee')) : 0, target = g('etfd-target') ? parseAmount(g('etfd-target')) : 0;
     if (!key) { toast('Escreva um nome curto, por exemplo World ou Bitcoin.'); return; }
-    if (!(ter >= 0) || !(target >= 0) || target > 100) { toast('TER ou peso alvo inválido: use números, ex.: 0,2 e 60.'); return; }
+    if (!(ter >= 0) || !(target >= 0) || target > 100) { toast('Taxa ou peso alvo inválido: use números, ex.: 0,2 e 60.'); return; }
     if (key !== old && S.etfs.etfs.some(e => e.key.toLowerCase() === key.toLowerCase())) { toast('Já existe um investimento com esse nome curto.'); return; }
-    const def = { key, kind: g('etfd-kind'), name: g('etfd-name'), ter: ter / 100, target: target / 100 };
+    const kind = KINDS.includes(g('etfd-kind')) ? g('etfd-kind') : 'ETF', prev = S.etfs.etfs.find(e => e.key === old) || {};
+    const def = { key, kind, name: g('etfd-name'), ter: KIND_INFO[kind].field === 'ter' ? ter / 100 : (prev.ter || 0), div: KIND_INFO[kind].field === 'div' ? ter / 100 : (prev.div || 0), target: target / 100 };
     if (old) { S.etfs.etfs = S.etfs.etfs.map(e => e.key === old ? def : e); if (key !== old) S.etfs.snaps = S.etfs.snaps.map(x => x.e === old ? { ...x, e: key } : x); }
     else S.etfs.etfs = [...S.etfs.etfs, def];
     UI.etfOpen = null; saveEtfs(); render();
     const sum = S.etfs.etfs.filter(e => kindOf(e) === def.kind).reduce((a, e) => a + (e.target || 0), 0);
     toast(old ? 'Investimento atualizado' : `Adicionado: ${key}` + (sum > 0 && Math.abs(sum - 1) > 0.001 ? ` · os pesos alvo dos ${KIND_PL[def.kind]} somam ${pct(sum)}` : ''));
-  } else if (f.id === 'etf-form') {
-    const d = document.getElementById('etf-date').value || today();
+  } else if (f.classList.contains('inv-form')) {
+    const kind = f.dataset.kind;
+    const d = document.getElementById('inv-date-' + kind).value || today();
     const add = [];
-    for (const r of S.etfs.etfs) {
+    for (const r of S.etfs.etfs.filter(e => kindOf(e) === kind)) {
       const inv = parseAmount(document.getElementById('etf-inv-' + r.key).value), val = parseAmount(document.getElementById('etf-val-' + r.key).value);
       if (isFinite(val) && val >= 0) add.push({ d, e: r.key, inv: isFinite(inv) ? inv : 0, val });
       else if (isFinite(inv) && inv > 0) { toast(`Indique também o valor atual de ${r.key}.`); return; }
@@ -1100,8 +1128,8 @@ function workbookData() {
     .concat(accs.length ? [[], [{ v: 'Total', s: 'b' }, '', { v: accs.reduce((s, a) => s + (+a.balance || 0), 0), s: 'beur' }, '', '', '', '', { v: accs.reduce((s, a) => s + accCalc(a).year, 0), s: 'beur' }, { v: accs.reduce((s, a) => s + accCalc(a).month, 0), s: 'beur' }]] : []);
   const histo = [H(['Data', 'Total em contas'])].concat((S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d)).map(h => [{ v: h.d, s: 'date' }, E(h.total)]));
   const EC = etfCalc();
-  const etfs = [H(['Investimento', 'Tipo', 'Nome', 'Custo anual', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo'])]
-    .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '']));
+  const etfs = [H(['Investimento', 'Tipo', 'Descrição', 'Custo anual', 'Dividendos', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo'])]
+    .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.div || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '']));
   const snaps = [H(['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'])].concat((S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.e.localeCompare(b.e)).map(x => [{ v: x.d, s: 'date' }, x.e, E(+x.inv || 0), E(+x.val || 0)]));
   return [
     { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
@@ -1109,7 +1137,7 @@ function workbookData() {
     { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
     { name: 'Contas', cols: [18, 20, 13, 9, 12, 13, 18, 20, 20], rows: contas, filterTo: accs.length + 1 },
     { name: 'Contas histórico', cols: [12, 16], rows: histo },
-    { name: 'Investimentos', cols: [14, 10, 40, 12, 10, 13, 13, 12, 10, 11, 14], rows: etfs },
+    { name: 'Investimentos', cols: [14, 10, 40, 12, 11, 10, 13, 13, 12, 10, 11, 14], rows: etfs },
     { name: 'Investimentos registos', cols: [12, 14, 20, 16], rows: snaps },
   ];
 }
