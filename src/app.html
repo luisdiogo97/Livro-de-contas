@@ -167,7 +167,10 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 .edit { display: grid; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 12px; }
 .catrow { display: grid; grid-template-columns: 1fr 96px 120px 34px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .catrow.nonat { grid-template-columns: 1fr 96px 34px; }
-@media (max-width: 420px) { .catrow { grid-template-columns: 1fr 84px 34px; } .catrow .nat { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .catrow { grid-template-columns: 1fr 84px 34px; } .catrow > span:first-child { grid-column: 1; grid-row: 1; } .catrow > input { grid-column: 2; grid-row: 1; } .catrow > .x { grid-column: 3; grid-row: 1; } .catrow .nat { grid-column: 1 / -1; grid-row: 2; } .catrow.label .nat { display: none; } }
+.autobtn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 99px; padding: 2px 9px; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+.autobtn[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.autobtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; }
 .x:hover { background: var(--surface-2); }
 /* home */
@@ -303,6 +306,48 @@ const saveCats = () => writeDoc('config/categories', { cats: S.cats });
 const saveSettings = () => writeDoc('config/settings', S.settings);
 const saveAccounts = () => writeDoc('config/accounts', S.accounts);
 const saveEtfs = () => writeDoc('config/etfs', S.etfs);
+
+// ---------- automatic monthly entries ----------
+// A category marked auto is registered on day 1 of every month with its budget value.
+// autoLast keeps the last month already handled, so a deleted entry is not added again.
+const autoId = (k, name) => 'auto-' + k + '-' + name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').toLowerCase();
+function runAuto(quiet) {
+  if (!db || S.dbState !== 'on' || !S.loaded.tx || !S.loaded.categories) return;
+  const cur = monthKey(today()), touched = new Set(), added = [];
+  let changed = false;
+  for (const c of S.cats) {
+    if (!c.auto || !(+c.budget > 0)) continue;
+    let k = c.autoLast ? addMonths(c.autoLast, 1) : cur;
+    if (k < addMonths(cur, -11)) k = addMonths(cur, -11);
+    while (k <= cur) {
+      const id = autoId(k, c.name);
+      if (!(S.months[k] || []).some(x => x.id === id)) {
+        S.months[k] = [...(S.months[k] || []), { id, d: k + '-01', v: Math.round(+c.budget * 100) / 100, c: c.name, n: 'Automático', m: '' }];
+        touched.add(k); added.push(c);
+      }
+      c.autoLast = k; changed = true; k = addMonths(k, 1);
+    }
+  }
+  if (!changed) return;
+  touched.forEach(k => saveMonth(k)); saveCats();
+  if (added.length) {
+    render();
+    if (quiet) return;
+    const names = [...new Set(added.map(c => c.name))];
+    toast(`Registado automaticamente: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` e mais ${names.length - 3}` : ''}`);
+  }
+}
+function toggleAuto(i) {
+  const c = S.cats[i]; if (!c) return;
+  if (c.auto) { c.auto = false; delete c.autoLast; saveCats(); render(); toast(`${c.name}: registo automático desligado.`); return; }
+  if (!(+c.budget > 0)) { toast(`Escreva primeiro o valor mensal de ${c.name} em Orç./mês.`); const el = document.getElementById('cb-' + i); if (el) el.focus(); return; }
+  const cur = monthKey(today()), already = (S.months[cur] || []).some(x => x.c === c.name);
+  c.auto = true; c.autoLast = already ? cur : addMonths(cur, -1);
+  saveCats();
+  if (already) { render(); toast(`${c.name} (${eur(c.budget)}) entra automaticamente no dia 1 de cada mês, a partir de ${monthLong(addMonths(cur, 1)).split(' ')[0]}. Este mês já tinha um registo.`); }
+  else { runAuto(true); toast(`Feito: ${c.name} (${eur(c.budget)}) já está em ${monthLong(cur).split(' ')[0]} e entra automaticamente no dia 1 de cada mês.`); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') runAuto(); });
 
 function addTx(item) {
   const key = monthKey(item.d);
@@ -880,7 +925,7 @@ function viewAjustes() {
     const cats = S.cats.map((c, i) => [c, i]).filter(([c]) => c.type === type);
     return `<section class="card"><h2>${type === 'Conta fixa' ? 'Contas fixas' : type === 'Dívida' ? 'Dívidas' : type === 'Receita' ? 'Receitas' : type === 'Poupança' ? 'Poupança e investimento' : 'Despesas variáveis'}</h2>
       <div class="catrow ${nat ? '' : 'nonat'} label" style="border:0"><span>Categoria</span><span>Orç./mês</span>${nat ? '<span class="nat">Natureza</span>' : ''}<span></span></div>
-      ${cats.map(([c, i]) => `<div class="catrow ${nat ? '' : 'nonat'}"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}${used[c.name] ? ` <span class="muted small">(${used[c.name]})</span>` : ''}</span>
+      ${cats.map(([c, i]) => `<div class="catrow ${nat ? '' : 'nonat'}"><span style="min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}${used[c.name] ? ` <span class="muted small">(${used[c.name]})</span>` : ''}</span><button type="button" class="autobtn" data-act="cat-auto" data-i="${i}" aria-pressed="${!!c.auto}" aria-label="Registar ${esc(c.name)} automaticamente no dia 1 de cada mês">↻ ${c.auto ? 'Automático no dia 1' : 'Automático'}</button></span>
         <input class="inp num" id="cb-${i}" data-cat="${i}" data-f="budget" inputmode="decimal" value="${c.budget ? esc(String(c.budget).replace('.', ',')) : ''}" placeholder="–" aria-label="Orçamento mensal de ${esc(c.name)}">
         ${nat ? `<select class="inp nat" id="cn-${i}" data-cat="${i}" data-f="nature" aria-label="Natureza de ${esc(c.name)}"><option value="Necessidade" ${c.nature !== 'Desejo' ? 'selected' : ''}>Necessidade</option><option value="Desejo" ${c.nature === 'Desejo' ? 'selected' : ''}>Desejo</option></select>` : ''}
         <button class="x" data-act="cat-del" data-i="${i}" aria-label="Remover ${esc(c.name)}" ${used[c.name] ? 'disabled title="Tem movimentos registados"' : ''}>×</button></div>`).join('')}
@@ -894,6 +939,7 @@ function viewAjustes() {
       <div class="row2"><div class="field"><label class="small" for="nc-name">Nome</label><input id="nc-name" placeholder="ex.: Animais"></div>
       <div class="field"><label class="small" for="nc-type">Tipo</label><select id="nc-type">${TYPES.map(t => `<option ${UI.addCatType === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
       <button class="btn" type="submit">Adicionar</button></form>
+    <p class="small muted" style="margin:0">Toque em <b>↻ Automático</b> numa categoria para a registar sozinha no dia 1 de cada mês, com o valor do orçamento (por exemplo, a renda ou o ginásio).</p>
     <div class="grid2">${['Despesa', 'Conta fixa'].map(block).join('')}</div>
     <div class="grid2">${['Receita', 'Poupança'].map(block).join('')}${block('Dívida')}
       <section class="card stack"><h2>Parâmetros</h2>
@@ -1039,6 +1085,7 @@ app.addEventListener('click', e => {
     if (UI.confirmAcc !== b.dataset.id) { UI.confirmAcc = b.dataset.id; render(); return; }
     S.accounts.accounts = S.accounts.accounts.filter(a => a.id !== b.dataset.id); UI.openAcc = null; recordHistory(); saveAccounts(); render();
   }
+  else if (act === 'cat-auto') toggleAuto(+b.dataset.i);
   else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
   else if (act === 'backup') doBackup();
@@ -1255,11 +1302,11 @@ renderTabs();
   db.collection('tx').onSnapshot(snap => {
     const m = {}; snap.docs.forEach(d => { m[d.id] = ((d.data() || {}).items || []).slice(); });
     const s = JSON.stringify(m); if (s === sig.tx && S.loaded.tx) return; sig.tx = s;
-    S.months = m; S.loaded.tx = true; render();
+    S.months = m; S.loaded.tx = true; render(); runAuto();
   }, err);
   const watch = (id, apply) => db.doc('config/' + id).onSnapshot(d => {
     const data = d.exists ? d.data() : null; const s = JSON.stringify(data); if (s === sig[id] && S.loaded[id]) return; sig[id] = s;
-    if (data) apply(JSON.parse(s)); S.loaded[id] = true; render();
+    if (data) apply(JSON.parse(s)); S.loaded[id] = true; render(); if (id === 'categories') runAuto();
   }, err);
   watch('categories', d => { S.cats = d.cats || []; });
   watch('settings', d => { S.settings = Object.assign(S.settings, d); });
