@@ -171,6 +171,7 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 .autobtn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 99px; padding: 2px 9px; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
 .autobtn[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .autobtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.catmove { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; margin-top: 4px; border-radius: 10px; background: var(--accent-soft); }
 .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; }
 .x:hover { background: var(--surface-2); }
 /* home */
@@ -274,7 +275,7 @@ let view = 'inicio';
 let curMonth = monthKey(today());
 let yearSel = 'last12';
 const F = { type: 'Despesa', amount: '', cat: '', date: today(), note: '', editing: null, confirmDel: false };
-const UI = { openAcc: null, confirmAcc: null, recentMonths: 0, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
+const UI = { catMove: null, openAcc: null, confirmAcc: null, recentMonths: 0, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
 let db = null, host = { kind: 'none', saveFile: null };
 const offMsg = () => host.kind === 'app' ? 'Não foi possível abrir os dados guardados neste telemóvel. Feche e volte a abrir a app.' : 'Sem ligação aos dados guardados. Abra esta página com a sua conta claude.ai para ver e registar movimentos.';
 
@@ -918,6 +919,38 @@ function accEdit(a) {
   </form>`;
 }
 
+// Removing a category that has entries: its entries move to another category first.
+function catMoveBox(c, i, n) {
+  const others = S.cats.filter(o => o !== c);
+  const lc = c.name.toLowerCase();
+  const guess = others.find(o => o.type === c.type && (o.name.toLowerCase().includes(lc) || lc.includes(o.name.toLowerCase()))) || others.find(o => o.type === c.type) || others[0];
+  const opts = TYPES.map(t => {
+    const list = others.filter(o => o.type === t);
+    return list.length ? `<optgroup label="${esc(t)}">${list.map(o => `<option ${o === guess ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  return `<div class="catmove" role="group" aria-label="Remover ${esc(c.name)}">
+    <p class="small" style="margin:0"><b>${esc(c.name)}</b> tem ${n} ${n === 1 ? 'movimento' : 'movimentos'}. Para a remover, passe ${n === 1 ? 'esse movimento' : 'esses movimentos'} para outra categoria:</p>
+    <div class="field"><label class="small" for="cm-to-${i}">Passar para</label><select id="cm-to-${i}">${opts}</select></div>
+    <div class="row2"><button class="btn" type="button" data-act="cat-move-cancel">Cancelar</button><button class="btn danger" type="button" data-act="cat-move" data-i="${i}">Passar e remover</button></div>
+  </div>`;
+}
+function moveAndRemoveCat(i) {
+  const c = S.cats[i], sel = document.getElementById('cm-to-' + i);
+  if (!c || !sel || !sel.value || sel.value === c.name) return;
+  const to = sel.value, moved = {};
+  let n = 0;
+  for (const k of Object.keys(S.months)) {
+    const ids = [];
+    S.months[k] = (S.months[k] || []).map(x => { if (x.c !== c.name) return x; ids.push(x.id); return { ...x, c: to }; });
+    if (ids.length) { moved[k] = ids; n += ids.length; saveMonth(k); }
+  }
+  S.cats.splice(i, 1); UI.catMove = null; saveCats(); render();
+  toast(`${c.name} removida. ${n} ${n === 1 ? 'movimento passou' : 'movimentos passaram'} para ${to}.`, { label: 'Desfazer', fn: () => {
+    for (const k of Object.keys(moved)) { const set = new Set(moved[k]); S.months[k] = (S.months[k] || []).map(x => set.has(x.id) ? { ...x, c: c.name } : x); saveMonth(k); }
+    S.cats.splice(Math.min(i, S.cats.length), 0, c); saveCats(); render();
+  } });
+}
+
 function viewAjustes() {
   const used = {}; for (const x of allTx()) used[x.c] = (used[x.c] || 0) + 1;
   const block = type => {
@@ -928,7 +961,8 @@ function viewAjustes() {
       ${cats.map(([c, i]) => `<div class="catrow ${nat ? '' : 'nonat'}"><span style="min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}${used[c.name] ? ` <span class="muted small">(${used[c.name]})</span>` : ''}</span><button type="button" class="autobtn" data-act="cat-auto" data-i="${i}" aria-pressed="${!!c.auto}" aria-label="Registar ${esc(c.name)} automaticamente no dia 1 de cada mês">↻ ${c.auto ? 'Automático no dia 1' : 'Automático'}</button></span>
         <input class="inp num" id="cb-${i}" data-cat="${i}" data-f="budget" inputmode="decimal" value="${c.budget ? esc(String(c.budget).replace('.', ',')) : ''}" placeholder="–" aria-label="Orçamento mensal de ${esc(c.name)}">
         ${nat ? `<select class="inp nat" id="cn-${i}" data-cat="${i}" data-f="nature" aria-label="Natureza de ${esc(c.name)}"><option value="Necessidade" ${c.nature !== 'Desejo' ? 'selected' : ''}>Necessidade</option><option value="Desejo" ${c.nature === 'Desejo' ? 'selected' : ''}>Desejo</option></select>` : ''}
-        <button class="x" data-act="cat-del" data-i="${i}" aria-label="Remover ${esc(c.name)}" ${used[c.name] ? 'disabled title="Tem movimentos registados"' : ''}>×</button></div>`).join('')}
+        <button class="x" data-act="cat-del" data-i="${i}" aria-label="Remover ${esc(c.name)}" aria-expanded="${UI.catMove === i}">×</button>
+        ${UI.catMove === i && used[c.name] ? catMoveBox(c, i, used[c.name]) : ''}</div>`).join('')}
     </section>`;
   };
   const s = S.settings;
@@ -1086,7 +1120,10 @@ app.addEventListener('click', e => {
     S.accounts.accounts = S.accounts.accounts.filter(a => a.id !== b.dataset.id); UI.openAcc = null; recordHistory(); saveAccounts(); render();
   }
   else if (act === 'cat-auto') toggleAuto(+b.dataset.i);
-  else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
+  else if (act === 'cat-move') moveAndRemoveCat(+b.dataset.i);
+  else if (act === 'cat-move-cancel') { UI.catMove = null; render(); }
+  else if (act === 'cat-del' && allTx().some(x => x.c === S.cats[+b.dataset.i]?.name)) { const i = +b.dataset.i; UI.catMove = UI.catMove === i ? null : i; render(); const el = document.getElementById('cm-to-' + i); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; UI.catMove = null; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
   else if (act === 'backup') doBackup();
   else if (act === 'restore-ok') doRestore();
