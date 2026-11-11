@@ -267,6 +267,7 @@ const KIND_INFO = {
   PPR: { title: 'PPR', add: '+ Adicionar PPR', empty: 'Ainda não tem PPR.', key: 'ex.: PPR Save & Grow', name: 'ex.: nome da entidade gestora', fee: 'Comissão de gestão anual (%)', feeShort: 'comissão de gestão', feePh: '1,5', field: 'ter' },
   Outro: { title: 'Outros investimentos', add: '+ Adicionar investimento', empty: 'Fundos, obrigações, certificados de aforro ou outros.', key: 'ex.: Certificados de Aforro', name: 'ex.: série F', fee: 'Custo anual (%)', feeShort: 'custo', feePh: '0,5', field: 'ter' },
 };
+const KIND_NEW = { ETF: 'do novo ETF', 'Ação': 'da nova ação', Cripto: 'da nova cripto', PPR: 'do novo PPR', Outro: 'do novo investimento' };
 const KIND_ONE = { ETF: 'ETF', 'Ação': 'ação', Cripto: 'cripto', PPR: 'PPR', Outro: 'investimento' };
 const nextFor = k => { const n = (S.settings.next || {})[k]; return n != null ? +n || 0 : k === 'ETF' ? +S.settings.nextContribution || 0 : 0; };
 const WEEK = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -390,7 +391,8 @@ function invChoice() {
   if (a && !accs.some(x => x.id === a)) a = '';
   let e = F.inv;
   if (e === undefined) { const last = allTx().filter(x => x.c === F.cat && x.lk && x.lk.e).sort((p, q) => q.d.localeCompare(p.d))[0]; e = last && invs.some(i => i.key === last.lk.e) ? last.lk.e : invs.length === 1 ? invs[0].key : ''; }
-  if (e && !invs.some(x => x.key === e)) e = '';
+  if (e && e !== '+new' && !invs.some(x => x.key === e)) e = '';
+  if (e === '+new') { const nm = (F.newInv || '').trim(), hit = invs.find(x => x.key.toLowerCase() === nm.toLowerCase()); return { kind, accs, invs, a, e: hit ? hit.key : nm, isNew: !hit, nm }; }
   return { kind, accs, invs, a, e };
 }
 function invAfter(ch) {
@@ -403,12 +405,13 @@ function invAfter(ch) {
 function invBox() {
   const ch = invChoice(); if (!ch) return '';
   const accChips = ch.accs.map(a => `<button type="button" class="chip" data-act="f-acc" data-v="${esc(a.id)}" aria-pressed="${ch.a === a.id}">${esc(a.bank)} <span class="muted">${eur0(a.balance)}</span></button>`).join('');
-  const invChips = ch.invs.map(e => `<button type="button" class="chip" data-act="f-inv" data-v="${esc(e.key)}" aria-pressed="${ch.e === e.key}">${esc(e.key)}</button>`).join('');
+  const invChips = ch.invs.map(e => `<button type="button" class="chip" data-act="f-inv" data-v="${esc(e.key)}" aria-pressed="${F.inv !== '+new' && ch.e === e.key}">${esc(e.key)}</button>`).join('');
   return `<div class="split-box">
     <span class="label">De que conta sai o dinheiro?</span>
     ${ch.accs.length ? `<div class="chips">${accChips}<button type="button" class="chip" data-act="f-acc" data-v="" aria-pressed="${!ch.a}">Não indicar</button></div><div class="small muted" id="inv-after">${invAfter(ch)}</div>` : '<p class="small muted" style="margin:0">Ainda não tem contas. Adicione-as no Património para a app descontar o valor do saldo.</p>'}
     <span class="label">Em que ${KIND_ONE[ch.kind]}?</span>
-    ${ch.invs.length ? `<div class="chips">${invChips}${ch.invs.length > 1 || !ch.e ? `<button type="button" class="chip" data-act="f-inv" data-v="" aria-pressed="${!ch.e}">Nenhum em especial</button>` : ''}</div>` : `<p class="small muted" style="margin:0">Ainda não tem ${KIND_PL[ch.kind]} no Património. Adicione lá para o valor contar como investido.</p>`}
+    <div class="chips">${invChips}<button type="button" class="chip" data-act="f-inv" data-v="+new" aria-pressed="${F.inv === '+new'}">${ch.kind === 'Ação' || ch.kind === 'Cripto' ? '+ Nova' : '+ Novo'}</button><button type="button" class="chip" data-act="f-inv" data-v="" aria-pressed="${!ch.e && F.inv !== '+new'}">Nenhum em especial</button></div>
+    ${F.inv === '+new' ? `<div class="field"><label class="small" for="f-newinv">Nome ${KIND_NEW[ch.kind]}</label><input id="f-newinv" class="inp" style="width:100%" placeholder="${esc(KIND_INFO[ch.kind].key)}" value="${esc(F.newInv || '')}"><span class="small muted">Fica também no Património. Taxas e peso alvo pode pôr lá depois.</span></div>` : ''}
   </div>`;
 }
 function addTx(item) {
@@ -936,7 +939,7 @@ function invCard(kind) {
     ppr = `<p class="small" style="background:var(--good-soft);padding:10px 12px;border-radius:10px;margin:8px 0 0">No IRS pode deduzir <b>20%</b> do que coloca em PPR em cada ano, até 400 € com menos de 35 anos, 350 € dos 35 aos 50 e 300 € a partir dos 50.${putIn ? ` Em ${y} já colocou <b>${eur0(putIn)}</b>, o que dá até <b>${eur0(Math.min(putIn * 0.2, 400))}</b> de dedução.` : ''}</p>`;
   }
   if (!E.rows.length) return `<section class="card"><h2 style="display:flex;align-items:center;gap:8px"><i class="sw" style="width:12px;height:12px;border-radius:4px;background:${color}"></i>${I.title}</h2>
-    <p class="empty">${I.empty}</p>${ppr}${addBtn}</section>`;
+    <p class="empty">${I.empty}</p><button class="btn primary" style="width:100%;margin:6px 0 4px" data-act="invest" data-kind="${k}">+ Investir em ${I.title}</button>${ppr}${addBtn}</section>`;
   const gain = E.totV - E.totI, many = E.rows.length > 1;
   return `<section class="card"><h2 style="display:flex;align-items:center;gap:8px"><i class="sw" style="width:12px;height:12px;border-radius:4px;background:${color}"></i>${I.title}</h2>
     <div class="kpis" style="margin-bottom:6px">
@@ -1155,7 +1158,7 @@ app.addEventListener('click', e => {
   if (act === 'type') { F.type = v; if (catType(F.cat) !== v) F.cat = ''; render(); }
   else if (act === 'cat') { F.cat = F.cat === v ? '' : v; F.inv = undefined; render(); }
   else if (act === 'f-acc') { F.acc = v; render(); }
-  else if (act === 'f-inv') { F.inv = v; render(); }
+  else if (act === 'f-inv') { F.inv = v; render(); if (v === '+new') { const el = document.getElementById('f-newinv'); if (el) el.focus(); } }
   else if (act === 'invest') { const kind = b.dataset.kind, c = catForKind(kind); resetForm(); Object.assign(F, { type: 'Poupança', cat: c.name, inv: b.dataset.key || undefined }); go('registar'); const el = document.getElementById('f-amount'); if (el) el.focus(); }
   else if (act === 'date') { F.date = v; render(); }
   else if (act === 'more-recent') { UI.recentMonths = UI.recentMonths ? UI.recentMonths + 1 : 2; render(); }
@@ -1202,6 +1205,7 @@ app.addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'f-amount') { F.amount = e.target.value; refreshSave(); }
   else if (id === 'f-note') F.note = e.target.value;
+  else if (id === 'f-newinv') { F.newInv = e.target.value; refreshSave(); }
   else if (id === 'f-split-pct') { SPL.pctText = e.target.value; const p = parseAmount(SPL.pctText); SPL.share = p > 0 && p < 100 ? p / 100 : NaN; refreshSave(); }
 });
 app.addEventListener('change', e => {
@@ -1227,7 +1231,7 @@ function refreshSave() {
   const inp = document.getElementById('f-amount'); if (inp) inp.setAttribute('aria-label', splitActive() ? 'Valor total em euros' : 'Valor em euros');
   const ia = document.getElementById('inv-after'), ch = ia && invChoice(); if (ch) ia.innerHTML = invAfter(ch);
 }
-function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false, acc: undefined, inv: undefined }); Object.assign(SPL, { on: false, auto: false, catSeen: '' }); }
+function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false, acc: undefined, inv: undefined, newInv: '' }); Object.assign(SPL, { on: false, auto: false, catSeen: '' }); }
 app.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target;
@@ -1236,6 +1240,11 @@ app.addEventListener('submit', e => {
     if (!(v > 0) || !F.cat) return;
     const note = ev.split ? splitNote(F.note.trim(), ev.total, SPL.share) : F.note.trim();
     const ch = invChoice();
+    if (ch && ch.isNew) {
+      if (!ch.nm) { toast(`Escreva o nome ${KIND_NEW[ch.kind]} ou escolha um da lista.`); const el = document.getElementById('f-newinv'); if (el) el.focus(); return; }
+      if (S.etfs.etfs.some(x => x.key.toLowerCase() === ch.nm.toLowerCase())) { toast('Já existe um investimento com esse nome noutra zona do Património.'); return; }
+      S.etfs.etfs = [...S.etfs.etfs, { key: ch.nm, kind: ch.kind, name: '', ter: 0, div: 0, target: 0 }]; saveEtfs();
+    }
     const withSplit = it => {
       const o = { ...it }; delete o.tt; delete o.sp; delete o.lk; if (ev.split) { o.tt = ev.total; o.sp = SPL.share; }
       if (ch && (ch.a || ch.e)) { o.lk = { a: ch.a, e: ch.e }; const acc = ch.accs.find(x => x.id === ch.a); o.m = acc ? acc.bank : ''; } else if (it.lk) o.m = '';
