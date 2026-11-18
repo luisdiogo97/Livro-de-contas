@@ -519,7 +519,13 @@ document.addEventListener('scroll', () => { tip.hidden = true; }, { passive: tru
 // ---------- charts (hand-drawn SVG, theme tokens) ----------
 function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
 function axisFmt(v) { return Math.abs(v) >= 1000 ? (v / 1000).toLocaleString('pt-PT', { maximumFractionDigits: 1 }) + ' mil' : Math.round(v).toLocaleString('pt-PT'); }
-function barChart({ labels, series, tips, h = 210, minY = 0 }) {
+// Top 3 spending categories of a month, for the Ano chart's tooltip.
+function topSpend(k) {
+  const by = {}; for (const x of S.months[k] || []) if (SPEND.includes(catType(x.c))) by[x.c] = (by[x.c] || 0) + x.v;
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return top.length ? '\n\nMaiores gastos:\n' + top.map(([c, v], i) => `${i + 1}. ${c}: ${eur(v)}`).join('\n') : '';
+}
+function barChart({ labels, series, tips, h = 210, minY = 0, acts }) {
   const W = 600, H = h, L = 58, R = 6, T = 10, B = 30, pw = W - L - R, ph = H - T - B;
   const allV = series.flatMap(s => s.values);
   const maxV = niceMax(Math.max(...allV, 100)), minV = Math.min(0, minY, ...allV) < 0 ? -niceMax(-Math.min(...allV)) : 0;
@@ -541,7 +547,7 @@ function barChart({ labels, series, tips, h = 210, minY = 0 }) {
       g += `<path d="${path}" fill="${s.color}"/>`;
     });
     if (i % every === 0) g += `<text x="${L + gw * i + gw / 2}" y="${H - 8}" text-anchor="middle">${esc(lab)}</text>`;
-    g += `<rect x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}" fill="transparent" data-tip="${esc(tips[i])}"/>`;
+    g += `<rect x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}" fill="transparent" data-tip="${esc(tips[i])}"${acts && acts[i] ? ` data-act="${acts[i][0]}" data-v="${esc(acts[i][1])}" style="cursor:pointer"` : ''}/>`;
   });
   if (minV < 0) g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
@@ -878,7 +884,8 @@ function viewAno() {
     </div>
     <section class="card chart"><h2>Receitas e gastos por mês</h2>
       ${legend([['Receitas', 'var(--s1)'], ['Gastos', 'var(--s2)']])}
-      ${barChart({ labels: win.map(k => monthShort(k).split(' ')[0]), series: [{ color: 'var(--s1)', values: per.map(p => p.Receita) }, { color: 'var(--s2)', values: per.map(p => p.gastos) }], tips: win.map((k, i) => `${monthShort(k)}\nReceitas: ${eur(per[i].Receita)}\nGastos: ${eur(per[i].gastos)}\nSobrou: ${eur(per[i].poupado)}`) })}
+      ${barChart({ labels: win.map(k => monthShort(k).split(' ')[0]), series: [{ color: 'var(--s1)', values: per.map(p => p.Receita) }, { color: 'var(--s2)', values: per.map(p => p.gastos) }], tips: win.map((k, i) => `${monthShort(k)}\nReceitas: ${eur(per[i].Receita)}\nGastos: ${eur(per[i].gastos)}\nSobrou: ${eur(per[i].poupado)}${topSpend(k)}`), acts: win.map(k => (S.months[k] || []).length ? ['open-month', k] : null) })}
+      <p class="small muted" style="margin:6px 0 0">Toque num mês para ver os gastos desse mês.</p>
     </section>
     <div class="grid2">
       <section class="card chart"><h2>Saldo acumulado</h2><p class="small muted" style="margin:-4px 0 8px">Receitas menos gastos, somados mês a mês.</p>
@@ -1317,6 +1324,7 @@ app.addEventListener('click', e => {
   else if (act === 'prev-m') { curMonth = addMonths(curMonth, -1); render(); }
   else if (act === 'next-m') { curMonth = addMonths(curMonth, 1); render(); }
   else if (act === 'year') { yearSel = v; render(); }
+  else if (act === 'open-month') { tip.hidden = true; curMonth = v; go('mes'); }
   else if (act === 'acc-open') { UI.openAcc = b.dataset.id; UI.confirmAcc = null; render(); }
   else if (act === 'acc-close') { UI.openAcc = null; render(); }
   else if (act === 'etf-add') { UI.etfOpen = 'new:' + b.dataset.kind; UI.confirmEtf = false; render(); const el = document.getElementById('etfd-key'); if (el) el.focus(); }
