@@ -380,6 +380,27 @@ function toggleAuto(i) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') runAuto(); });
 
+// ---------- the everyday account: its balance follows the entries ----------
+// One account can carry auto = { d, bal }: bal is its balance at the start of day d.
+// Every entry from that day up to today moves it: income adds, everything else takes away.
+// Investment entries count only when they say they came from this account, and entries
+// linked to another account never count. The result is stored in balance, so the rest of
+// the app (totals, charts, export, sync) keeps reading one number.
+const mainAcc = () => (S.accounts.accounts || []).find(a => a.auto && a.auto.d);
+const countsFor = (a, x) => x.lk && x.lk.a ? x.lk.a === a.id : !catKind(x.c);
+function flowOf(a, from, to) {
+  let inn = 0, out = 0;
+  for (const x of allTx()) if (x.d >= from && x.d <= to && countsFor(a, x)) { if (catType(x.c) === 'Receita') inn += +x.v || 0; else out += +x.v || 0; }
+  return { inn: Math.round(inn * 100) / 100, out: Math.round(out * 100) / 100 };
+}
+function autoBalance(a) { const f = flowOf(a, a.auto.d, today()); return Math.round(((+a.auto.bal || 0) + f.inn - f.out) * 100) / 100; }
+function refreshMain() {
+  if (!S.loaded.tx || !S.loaded.accounts || S.dbState !== 'on') return;
+  const a = mainAcc(); if (!a) return;
+  const b = autoBalance(a); if (b === +a.balance) return;
+  a.balance = b; recordHistory(); saveAccounts();
+}
+
 // ---------- investments paid from an account ----------
 // An entry in an investment category can carry lk = { a: account id, e: investment key }.
 // Saving it takes the amount from that account and adds it to the investment as money put in;
@@ -401,7 +422,7 @@ function invLastVal(e, d) {
 }
 function applyLink(tx, sign) {
   const lk = tx && tx.lk; if (!lk) return;
-  if (lk.a) { const a = (S.accounts.accounts || []).find(x => x.id === lk.a); if (a) { a.balance = Math.round(((+a.balance || 0) - sign * tx.v) * 100) / 100; recordHistory(); saveAccounts(); } }
+  if (lk.a) { const a = (S.accounts.accounts || []).find(x => x.id === lk.a); if (a && !(a.auto && a.auto.d)) { a.balance = Math.round(((+a.balance || 0) - sign * tx.v) * 100) / 100; recordHistory(); saveAccounts(); } }
   if (lk.e) {
     const sid = 'tx-' + tx.id;
     S.etfs.snaps = (S.etfs.snaps || []).filter(x => x.id !== sid);
@@ -620,7 +641,7 @@ function viewInicio() {
   const byCat = {}; for (const x of items) if (catType(x.c) === 'Despesa') byCat[x.c] = (byCat[x.c] || 0) + x.v;
   const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 4), topMax = top.length ? top[0][1] : 1;
   const recent = allTx().filter(x => x.d <= td).slice().sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id)).slice(0, 4);
-  const accs = S.accounts.accounts || [], E = etfCalc();
+  const accs = S.accounts.accounts || [], E = etfCalc(), main = mainAcc();
   const net = accs.reduce((a, x) => a + (+x.balance || 0), 0) + E.totV, juroMes = accs.reduce((a, x) => a + accCalc(x).month, 0);
   const usedPct = bud > 0 ? Math.min(1, spent / bud) : 0, dayPct = dDone / dTot;
   const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', '#8b5cf6'];
@@ -667,6 +688,8 @@ function viewInicio() {
     <section class="card"><div class="cardhead"><h2>Últimos movimentos</h2><button class="btn ghost small" data-act="goto" data-v="registar">Ver todos</button></div>
       <div class="list">${recent.map(x => rowTx(x)).join('') || '<p class="empty">Ainda não registou nenhum movimento.</p>'}</div>
     </section>
+    ${main ? `<button class="card patri" data-act="goto" data-v="patrimonio"><div><div class="label">${esc(main.bank)}${main.product ? ' · ' + esc(main.product) : ''}</div><div class="v">${eur(main.balance)}</div>
+      <div class="small muted">Desde ${esc(dayShort(main.auto.d))}: ${accFlowText(main)}</div></div>${ic.chev}</button>` : ''}
     <button class="card patri" data-act="goto" data-v="patrimonio"><div><div class="label">Património</div><div class="v">${eur(net)}</div>
       <div class="small muted">${juroMes > 0 ? `As suas contas rendem cerca de ${eur(juroMes)} por mês` : 'Contas, poupanças e investimentos'}</div></div>${ic.chev}</button>
   </div></div>`;
@@ -928,7 +951,7 @@ function viewPatrimonio() {
     const realPill = (+a.tanb || 0) === 0 ? '<span class="pill neutral">sem juros</span>' : c.real < 0 ? `<span class="pill warn">▼ ${pct2(c.real)} real</span>` : `<span class="pill good">▲ ${pct2(c.real)} real</span>`;
     const fgd = byBank[a.bank] > S.settings.fgd ? '<span class="pill bad">acima do limite do Fundo de Garantia</span>' : '';
     return `<div class="acc"><div class="head"><b>${esc(a.bank)}</b><span class="num" style="font-weight:700">${eur(a.balance)}</span></div>
-      <div class="meta"><span>${esc(a.product)}</span><span>TANB ${pct2(+a.tanb || 0)}</span><span>Líquida ${pct2(c.eff)}</span><span>${eur(c.month)}/mês</span><span>${eur0(c.year)}/ano</span>${realPill}${fgd}</div>
+      <div class="meta"><span>${esc(a.product)}</span><span>TANB ${pct2(+a.tanb || 0)}</span><span>Líquida ${pct2(c.eff)}</span>${a.auto ? `<span class="pill good">↻ atualiza com os movimentos desde ${esc(dayShort(a.auto.d))}</span>` : ''}<span>${eur(c.month)}/mês</span><span>${eur0(c.year)}/ano</span>${realPill}${fgd}</div>
       ${open ? accEdit(a) : `<div><button class="btn ghost small" data-act="acc-open" data-id="${esc(a.id)}">Atualizar saldo ou taxa</button></div>`}</div>`;
   };
   const hist = (S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d));
@@ -1022,6 +1045,7 @@ function etfEdit(r, kind) {
     ${r ? `<button class="btn danger small" type="button" data-act="etf-del" data-key="${esc(r.key)}">${UI.confirmEtf ? 'Confirmar: remover e apagar os seus registos' : 'Remover'}</button>` : ''}
   </form>`;
 }
+function accFlowText(a) { const f = flowOf(a, a.auto.d, today()); return `entraram ${eur(f.inn)} e saíram ${eur(f.out)}`; }
 function accEdit(a) {
   const id = esc(a.id);
   return `<form class="edit" data-acc="${id}" autocomplete="off">
@@ -1031,6 +1055,9 @@ function accEdit(a) {
     <div class="field"><label class="small" for="acc-tanb-${id}">TANB (%)</label><input id="acc-tanb-${id}" inputmode="decimal" value="${esc(String(+(a.tanb * 100).toFixed(3)).replace('.', ','))}"></div></div>
     <div class="row2"><div class="field"><label class="small" for="acc-cap-${id}">Juros pagos</label><select id="acc-cap-${id}">${Object.keys(CAPN).map(k => `<option ${a.cap === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
     <div class="field"><label class="small" for="acc-irs-${id}">Retenção IRS</label><select id="acc-irs-${id}"><option value="1" ${a.irs ? 'selected' : ''}>Sim (${pct(S.settings.irs)})</option><option value="0" ${a.irs ? '' : 'selected'}>Não</option></select></div></div>
+    <div class="row2"><div class="field"><label class="small" for="acc-auto-${id}">Despesas e receitas mexem no saldo</label><select id="acc-auto-${id}"><option value="1" ${a.auto ? 'selected' : ''}>Sim, é a conta do dia a dia</option><option value="0" ${a.auto ? '' : 'selected'}>Não</option></select></div>
+    <div class="field"><label class="small" for="acc-date-${id}">Este saldo é do dia</label><input type="date" id="acc-date-${id}" value="${today()}" max="${today()}"></div></div>
+    <p class="small muted" style="margin:0">${a.auto ? `Desde ${esc(dayShort(a.auto.d))} ${a.auto.d.slice(0, 4)} (${eur(a.auto.bal)} no início do dia): ${accFlowText(a)}. Se o saldo no banco for outro, escreva-o aqui com a data de hoje.` : 'Com Sim, as despesas, contas fixas, poupanças e receitas que registar passam a sair desta conta ou a entrar nela, e o saldo atualiza-se sozinho. Para um saldo de outro dia (ex.: o início do mês), escolha esse dia: os movimentos registados desde então entram na conta.'}</p>
     <div class="row2"><button class="btn" type="submit">Guardar</button><button class="btn" type="button" data-act="acc-close">Cancelar</button></div>
     <button class="btn danger small" type="button" data-act="acc-del" data-id="${id}">${UI.confirmAcc === a.id ? 'Confirmar remover conta' : 'Remover conta'}</button>
   </form>`;
@@ -1233,6 +1260,7 @@ function renderTabs() {
 }
 function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
+  refreshMain();
   const a = document.activeElement, aid = a && a.id, sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
   const html = (S.dbState === 'off' ? '<div class="banner">' + offMsg() + '</div>' : '') +
     ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
@@ -1372,7 +1400,8 @@ app.addEventListener('submit', e => {
       const item = withSplit({ id: newId(), d: F.date, v, c: F.cat, n: note, m: '' });
       const type = F.type; resetForm(); F.type = type;
       addTx(item);
-      toast(`Guardado: ${item.c} ${eur(v)}${linkMsg(item)}`, { label: 'Desfazer', fn: () => removeTx(item.id) });
+      const mA = mainAcc(), mMsg = mA && item.d >= mA.auto.d && item.d <= today() && countsFor(mA, item) ? ` · ${mA.bank} fica com ${eur(mA.balance)}` : '';
+      toast(`Guardado: ${item.c} ${eur(v)}${linkMsg(item)}${mMsg}`, { label: 'Desfazer', fn: () => removeTx(item.id) });
       const el = document.getElementById('f-amount'); if (el) el.focus();
     }
   } else if (f.dataset.acc) {
@@ -1380,8 +1409,20 @@ app.addEventListener('submit', e => {
     const id = a.id, g = s => document.getElementById(`acc-${s}-${id}`).value;
     const bal = parseAmount(g('bal')), tanb = parseAmount(g('tanb'));
     if (!(bal >= 0) || !(tanb >= 0)) { toast('Saldo ou TANB inválido: use números, ex.: 2500,50 e 1,5.'); return; }
+    const autoOn = g('auto') === '1', d = g('date') || today(), td = today();
+    const keep = a.auto && d === td && bal === +a.balance; // only bank/rate changed: keep the starting point
+    if (autoOn && d > td) { toast('A data do saldo não pode ser depois de hoje.'); return; }
     Object.assign(a, { bank: g('bank').trim() || a.bank, product: g('prod').trim(), balance: bal, tanb: tanb / 100, cap: g('cap'), irs: g('irs') === '1' });
-    UI.openAcc = null; recordHistory(); saveAccounts(); render(); toast('Conta atualizada');
+    if (!autoOn) delete a.auto;
+    else if (keep) a.balance = autoBalance(a);
+    else {
+      // A balance typed for today already includes today's entries; one for an earlier day is the start of that day.
+      const f = d === td ? flowOf(a, td, td) : { inn: 0, out: 0 };
+      a.auto = { d, bal: Math.round((bal - f.inn + f.out) * 100) / 100 };
+      S.accounts.accounts.forEach(o => { if (o !== a) delete o.auto; });
+      a.balance = autoBalance(a);
+    }
+    UI.openAcc = null; recordHistory(); saveAccounts(); render(); toast(autoOn ? `Conta atualizada · saldo agora ${eur(a.balance)}` : 'Conta atualizada');
   } else if (f.id === 'etf-def') {
     const old = f.dataset.key, g = id => document.getElementById(id).value.trim();
     const key = g('etfd-key'), ter = g('etfd-fee') ? parseAmount(g('etfd-fee')) : 0, target = g('etfd-target') ? parseAmount(g('etfd-target')) : 0;
