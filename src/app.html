@@ -1093,6 +1093,8 @@ function restoreBlock() {
 function welcomeCard() {
   return `<section class="card stack"><h2>Bem-vindo ao Livro de Contas</h2>
     <p class="small">Toque em <b>Despesa</b> para registar a primeira. Já tem categorias base criadas; pode mudá-las, apagá-las ou definir orçamentos em Ajustes.</p>
+    ${host.kind === 'artifact' ? `<p class="small"><b>Usa a app no telemóvel?</b> Esta página do claude.ai não se liga ao telemóvel. Para ver no computador os mesmos dados, abra a versão para PC e ligue lá a sincronização com o Google Drive.</p>
+    <a class="btn primary" style="text-align:center;text-decoration:none" href="${WEB_URL}" target="_blank" rel="noopener">Abrir o Livro de Contas para PC</a>` : ''}
     ${SYNC && SYNC.configured && !SYNC.on ? `<p class="small muted">Já usa o Livro de Contas noutro aparelho com a sincronização ligada? Ligue-a também aqui e os dados aparecem sozinhos.</p>
     <button class="btn primary" data-act="sync-on">Ligar ao Google Drive</button>` : ''}
     <p class="small muted">Tem uma cópia de segurança (ficheiro .json) de outro telemóvel ou da página Livro de Contas? Importe-a e continua com todo o histórico.</p>
