@@ -284,8 +284,10 @@ let curMonth = monthKey(today());
 let yearSel = 'last12';
 const F = { type: 'Despesa', amount: '', cat: '', date: today(), note: '', editing: null, confirmDel: false };
 const UI = { catMove: null, openAcc: null, confirmAcc: null, recentMonths: 0, addCatType: 'Despesa', pendingRestore: null, etfOpen: null, confirmEtf: false };
-let db = null, host = { kind: 'none', saveFile: null };
-const offMsg = () => host.kind === 'app' ? 'Não foi possível abrir os dados guardados neste telemóvel. Feche e volte a abrir a app.' : 'Sem ligação aos dados guardados. Abra esta página com a sua conta claude.ai para ver e registar movimentos.';
+let db = null, host = { kind: 'none', saveFile: null, platform: '' };
+const WEB_URL = 'https://luisdiogo97.github.io/Livro-de-contas/';
+const here = () => host.platform === 'web' ? 'neste computador' : 'neste telemóvel';
+const offMsg = () => host.kind === 'app' ? `Não foi possível abrir os dados guardados ${here()}. ${host.platform === 'web' ? 'Recarregue a página.' : 'Feche e volte a abrir a app.'}` : 'Sem ligação aos dados guardados. Abra esta página com a sua conta claude.ai para ver e registar movimentos.';
 
 const catType = name => (S.cats.find(c => c.name === name) || {}).type || 'Despesa';
 const allTx = () => Object.values(S.months).flat();
@@ -616,6 +618,7 @@ function viewInicio() {
   <div class="hello"><div><h1>${greet}${name ? ', ' + esc(name) : ''}</h1><div class="sub">${esc(cap(dayLong(td)))}</div></div>
     <button class="gear" data-act="goto" data-v="ajustes" aria-label="Ajustes">${ic.gear}</button></div>
   <div class="stack">
+    ${syncBanner()}
     ${!allTx().length ? welcomeCard() : ''}
     <section class="home-hero">
       <div class="lbl"><span>Gastos de ${esc(mName)}</span><span>${left ? `faltam ${left} dia${left > 1 ? 's' : ''}` : 'último dia'}</span></div>
@@ -677,7 +680,8 @@ function viewRegistar() {
   const typesShown = TYPES.filter(tp => tp !== 'Dívida' || S.cats.some(c => c.type === 'Dívida' && freq[c.name]));
   return `
   <header class="top"><h1>${F.editing ? 'Editar movimento' : 'Registar'}</h1><span class="sub">${esc(dayLong(today()))}</span></header>
-  ${host.kind === 'app' && allTx().length && (!S.settings.lastBackup || (parseD(today()) - parseD(S.settings.lastBackup)) / 864e5 > 30) ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${S.settings.lastBackup ? 'Já passou mais de um mês desde a última cópia de segurança.' : 'Ainda não fez nenhuma cópia de segurança dos seus dados.'}</span><button class="btn small" data-act="backup">Fazer agora</button></div>` : ''}
+  ${syncBanner()}
+  ${host.kind === 'app' && !(SYNC && SYNC.on) && allTx().length && (!S.settings.lastBackup || (parseD(today()) - parseD(S.settings.lastBackup)) / 864e5 > 30) ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>${S.settings.lastBackup ? 'Já passou mais de um mês desde a última cópia de segurança.' : 'Ainda não fez nenhuma cópia de segurança dos seus dados.'}</span><button class="btn small" data-act="backup">Fazer agora</button></div>` : ''}
   <div class="grid2">
   <div class="stack">
     <form class="card stack" id="entry" autocomplete="off">
@@ -1074,6 +1078,7 @@ function viewAjustes() {
         <div class="field"><label class="small" for="set-irs">IRS sobre juros (%)</label><input id="set-irs" class="inp" inputmode="decimal" value="${esc(String(+(s.irs * 100).toFixed(2)).replace('.', ','))}"></div></div>
         <p class="small muted">A inflação de 2% é o objetivo do BCE; atualize com a previsão mais recente do Banco de Portugal. Os juros de depósitos em Portugal têm retenção de 28%.</p>
       </section>
+      ${syncCard()}
       ${backupCard()}
     </div>
   </div>`;
@@ -1088,15 +1093,57 @@ function restoreBlock() {
 function welcomeCard() {
   return `<section class="card stack"><h2>Bem-vindo ao Livro de Contas</h2>
     <p class="small">Toque em <b>Despesa</b> para registar a primeira. Já tem categorias base criadas; pode mudá-las, apagá-las ou definir orçamentos em Ajustes.</p>
-    <p class="small muted">Já tem dados de outro telemóvel ou da página Livro de Contas? Importe a cópia de segurança (ficheiro .json) e continua com todo o histórico.</p>
+    ${SYNC && SYNC.configured && !SYNC.on ? `<p class="small muted">Já usa o Livro de Contas noutro aparelho com a sincronização ligada? Ligue-a também aqui e os dados aparecem sozinhos.</p>
+    <button class="btn primary" data-act="sync-on">Ligar ao Google Drive</button>` : ''}
+    <p class="small muted">Tem uma cópia de segurança (ficheiro .json) de outro telemóvel ou da página Livro de Contas? Importe-a e continua com todo o histórico.</p>
     ${restoreBlock()}</section>`;
 }
+// ---------- sync between phone and PC (src/sync.js, through the person's Google Drive) ----------
+let SYNC = null;
+function syncWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), day = isoOf(d), hm = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  return day === today() ? 'hoje às ' + hm : esc(dayShort(day)) + ' às ' + hm;
+}
+function syncChoice() {
+  return `<p class="small"><b>Este aparelho e o Google Drive já têm movimentos.</b> Escolha o que fazer na primeira sincronização:</p>
+    <div class="row2"><button class="btn primary" data-act="sync-choose" data-v="drive">Usar os dados do Drive</button><button class="btn" data-act="sync-choose" data-v="merge">Juntar os dois</button></div>
+    <p class="small muted">"Usar os dados do Drive" substitui o que está ${here()} pelo que já está sincronizado. "Juntar os dois" mantém os movimentos dos dois lados.</p>`;
+}
+function syncBanner() {
+  if (!SYNC || !SYNC.on) return '';
+  if (SYNC.status === 'choose') return `<div class="banner stack">${syncChoice()}</div>`;
+  if (SYNC.status === 'login') return `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Sincronização em pausa: entre outra vez na conta Google.</span><button class="btn small" data-act="sync-on">Entrar</button></div>`;
+  return '';
+}
+function syncCard() {
+  const sy = window.LDC && window.LDC.sync;
+  if (!sy) return host.kind === 'artifact' ? `<section class="card stack"><h2>Telemóvel e PC</h2>
+    <p class="small muted">Para ter no computador os mesmos dados da app do telemóvel, abra <a href="${WEB_URL}" target="_blank" rel="noopener">o Livro de Contas para PC</a> e ligue a sincronização com o Google Drive nos dois. Os dados desta página não entram na sincronização; para os passar, use a cópia de segurança.</p></section>` : '';
+  const i = SYNC || sy.info(), other = host.platform === 'web' ? 'telemóvel' : 'computador';
+  let body;
+  if (!i.configured) body = `<p class="small muted">A sincronização ainda não está disponível nesta versão.</p>`;
+  else if (!i.on) body = `<p class="small muted">Guarde os dados no seu Google Drive para ter o mesmo Livro de Contas no telemóvel e no computador. Ficam numa pasta escondida que só esta app consegue ver; os seus outros ficheiros do Drive ficam fora do alcance da app.</p>
+    ${i.error ? `<p class="small"><b>${esc(i.error)}</b></p>` : ''}
+    <button class="btn primary" data-act="sync-on">Ligar ao Google Drive</button>
+    ${host.platform !== 'web' ? `<p class="small muted">No computador, abra <a href="${WEB_URL}" target="_blank" rel="noopener">${esc(WEB_URL.replace('https://', '').replace(/\/$/, ''))}</a> e ligue também lá.</p>` : ''}`;
+  else if (i.status === 'choose') body = syncChoice();
+  else body = `<p class="small">${i.status === 'syncing' ? 'A sincronizar…'
+      : i.status === 'login' ? '<b>Em pausa:</b> é preciso entrar outra vez na conta Google.'
+      : i.status === 'error' ? '<b>' + esc(i.error) + '</b>'
+      : 'Ligado ao Google Drive.'}${i.lastSync && i.status !== 'syncing' ? ` Última sincronização ${syncWhen(i.lastSync)}.` : ''}</p>
+    <p class="small muted">O que regista aqui aparece no ${other} e vice-versa. Funciona sem internet e acerta tudo quando a ligação voltar.</p>
+    <div class="row2">${i.status === 'login' ? '<button class="btn primary" data-act="sync-on">Entrar na conta Google</button>' : `<button class="btn" data-act="sync-now" ${i.status === 'syncing' ? 'disabled' : ''}>Sincronizar agora</button>`}
+      <button class="btn" data-act="sync-off">Desligar</button></div>`;
+  return `<section class="card stack"><h2>Telemóvel e PC</h2>${body}</section>`;
+}
+
 function backupCard() {
   const last = S.settings.lastBackup, app = host.kind === 'app';
   return `<section class="card stack"><h2>Cópia de segurança</h2>
-    <p class="small muted">${app ? 'Os dados ficam só neste telemóvel. Guarde uma cópia de vez em quando (por exemplo no Google Drive) para não os perder se mudar ou perder o telemóvel.' : 'Guarde uma cópia completa dos dados num ficheiro. Serve também para passar tudo para a app Android.'}</p>
+    <p class="small muted">${app && SYNC && SYNC.on ? 'Com a sincronização ligada, o Google Drive já guarda uma cópia de tudo. Pode também guardar um ficheiro de cópia quando quiser.' : app ? `Os dados ficam só ${here()}. Guarde uma cópia de vez em quando (por exemplo no Google Drive) para não os perder.` : 'Guarde uma cópia completa dos dados num ficheiro. Serve também para passar tudo para a app Android.'}</p>
     <p class="small">${last ? 'Última cópia: <b>' + esc(dayShort(last)) + ' ' + esc(last.slice(0, 4)) + '</b>' : 'Ainda não guardou nenhuma cópia.'}</p>
-    <button class="btn" data-act="backup" ${host.saveFile ? '' : 'disabled'}>${app ? 'Guardar cópia (partilhar ou guardar no Drive)' : 'Descarregar cópia completa'}</button>
+    <button class="btn" data-act="backup" ${host.saveFile ? '' : 'disabled'}>${app && host.platform !== 'web' ? 'Guardar cópia (partilhar ou guardar no Drive)' : 'Descarregar cópia completa'}</button>
     ${restoreBlock()}
     <h2 style="margin-top:6px">Exportar para Excel</h2>
     <p class="small muted">Tudo numa folha Excel: movimentos, resumo de cada mês, categorias com totais e médias, contas e investimentos.</p>
@@ -1221,6 +1268,10 @@ app.addEventListener('click', e => {
   else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; UI.catMove = null; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
   else if (act === 'backup') doBackup();
+  else if (act === 'sync-on') window.LDC.sync.connect();
+  else if (act === 'sync-now') window.LDC.sync.syncNow();
+  else if (act === 'sync-choose') window.LDC.sync.choose(b.dataset.v);
+  else if (act === 'sync-off') { window.LDC.sync.disconnect(); toast('Sincronização desligada. Os dados continuam ' + here() + '.'); }
   else if (act === 'restore-ok') doRestore();
   else if (act === 'restore-cancel') { UI.pendingRestore = null; render(); }
 });
@@ -1431,9 +1482,13 @@ async function exportXlsx() {
 renderTabs();
 (async () => {
   if (window.LDC) {
-    // Android app: data lives on the phone (see src/native.js)
-    host = { kind: 'app', saveFile: window.LDC.saveFile };
+    // Android app (data on the phone) or PC version (data in this browser); see src/native.js
+    host = { kind: 'app', saveFile: window.LDC.saveFile, platform: window.LDC.platform || 'android' };
     db = await window.LDC.openDb().catch(() => null);
+    if (db && window.LDC.sync) window.LDC.sync.onChange(i => {
+      const was = SYNC; SYNC = i;
+      if (!was || was.status !== i.status || was.on !== i.on || was.lastSync !== i.lastSync) render();
+    });
   } else {
     const c = window.claude;
     const downloads = c && c.use ? await c.use('downloads').catch(() => null) : null;

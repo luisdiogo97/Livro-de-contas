@@ -1,12 +1,14 @@
-// Phone-side storage and file sharing for the Android app.
+// Storage and file sharing for the Android app and for the PC (browser) version.
 // Exposes window.LDC with the same small document API the page uses on claude.ai
 // (doc(path).set/delete/onSnapshot, collection(name).onSnapshot), backed by
-// Capacitor Preferences so every document is kept on the device.
+// Capacitor Preferences: on the phone the data is kept on the device, in the browser
+// in the browser's local storage. src/sync.js keeps both the same through Google Drive.
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import seed from '../seed/default.json';
+import { createSync } from './sync.js';
 
 const PREFIX = 'ldc:';
 const docs = new Map();          // path -> data
@@ -53,6 +55,28 @@ async function load() {
   }
 }
 
+async function writeDoc(path, data) {
+  if (data === undefined) {
+    docs.delete(path);
+    await Preferences.remove({ key: PREFIX + path });
+  } else {
+    docs.set(path, clone(data));
+    await Preferences.set({ key: PREFIX + path, value: JSON.stringify(data) });
+  }
+  notify(path);
+}
+
+const sync = createSync({
+  native: Capacitor.isNativePlatform(),
+  docs,
+  applyDoc: writeDoc,   // changes coming from the Drive: saved here, not sent back as new changes
+  store: {
+    get: async (key) => (await Preferences.get({ key })).value,
+    set: (key, value) => Preferences.set({ key, value }),
+    remove: (key) => Preferences.remove({ key }),
+  },
+});
+
 const db = {
   doc(path) {
     return {
@@ -60,14 +84,12 @@ const db = {
       path,
       async get() { return docSnap(path); },
       async set(data) {
-        docs.set(path, clone(data));
-        await Preferences.set({ key: PREFIX + path, value: JSON.stringify(data) });
-        notify(path);
+        await writeDoc(path, data);
+        sync.touched(path);
       },
       async delete() {
-        docs.delete(path);
-        await Preferences.remove({ key: PREFIX + path });
-        notify(path);
+        await writeDoc(path, undefined);
+        sync.touched(path);
       },
       onSnapshot(next) { return listen(docListeners, path, next, () => docSnap(path)); },
     };
@@ -79,7 +101,7 @@ const db = {
 
 let ready = null;
 async function openDb() {
-  if (!ready) ready = load().then(() => db);
+  if (!ready) ready = load().then(async () => { await sync.init(); return db; });
   return ready;
 }
 
@@ -105,4 +127,4 @@ async function saveFile(filename, data, mime) {
   await Share.share({ title: filename, files: [uri], dialogTitle: 'Guardar ou enviar' });
 }
 
-window.LDC = { openDb, saveFile };
+window.LDC = { openDb, saveFile, sync, platform: Capacitor.isNativePlatform() ? 'android' : 'web' };
