@@ -1,0 +1,39 @@
+name: Verificar alterações
+
+# Builds an unsigned debug APK for pull requests, to catch errors before they reach main.
+# Nothing is published.
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Android SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          if ! ./gradlew assembleDebug --no-daemon 2>&1 | tee "$RUNNER_TEMP/gradle.log"; then
+            grep -n -E "What went wrong|error:|FAILURE|Exception|Could not" "$RUNNER_TEMP/gradle.log" | head -40 > "$RUNNER_TEMP/gradle.err" || true
+            tail -40 "$RUNNER_TEMP/gradle.log" >> "$RUNNER_TEMP/gradle.err"
+            msg=$(sed -e 's/%/%25/g' "$RUNNER_TEMP/gradle.err" | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Gradle::${msg}"
+            exit 1
+          fi
