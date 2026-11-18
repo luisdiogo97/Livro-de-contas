@@ -847,6 +847,11 @@ function viewAno() {
   // 50/30/20
   let need = 0, want = 0; for (const x of items) { if (!SPEND.includes(catType(x.c))) continue; const n = (S.cats.find(c => c.name === x.c) || {}).nature; if (n === 'Desejo') want += x.v; else need += x.v; }
   const rule = [['Necessidades', need, 0.5], ['Desejos', want, 0.3], ['Poupança', tot.Receita - need - want, 0.2]];
+  // What was actually put aside in the period: money added to investments (Património records) plus
+  // Poupança entries not already linked to an investment (those create their own investment record).
+  const inWin = d => win.includes(monthKey(d));
+  const putInv = (S.etfs.snaps || []).filter(x => inWin(x.d)).reduce((a, x) => a + (+x.inv || 0), 0);
+  const putSav = items.filter(x => catType(x.c) === 'Poupança' && !(x.lk && x.lk.e)).reduce((a, x) => a + x.v, 0);
   // weekday
   const wd = Array(7).fill(0), wn = Array(7).fill(0);
   for (const x of items) if (catType(x.c) === 'Despesa') { const i = (parseD(x.d).getDay() + 6) % 7; wd[i] += x.v; wn[i]++; }
@@ -880,6 +885,9 @@ function viewAno() {
         ${lineChart({ labels: win.map(k => monthShort(k).split(' ')[0]), series: [{ color: 'var(--s1)', values: cum, area: true }], tips: win.map((k, i) => `${monthShort(k)}: ${eur(cum[i])}`) })}</section>
       <section class="card"><h2>Regra 50/30/20</h2>
         ${rule.map(([n, v, ref]) => { const p = tot.Receita ? v / tot.Receita : 0; const ok = n === 'Poupança' ? p >= ref : p <= ref; return `<div class="bud"><div class="top"><b>${n}</b><span class="num">${eur0(v)} · <b>${pct(p)}</b> <span class="muted">(ref. ${pct(ref).replace(',0', '')})</span></span></div><div class="track"><i class="${ok ? '' : 'bad'}" style="width:${Math.max(0, Math.min(100, p * 100)).toFixed(1)}%"></i></div><div><span class="pill ${ok ? 'good' : 'bad'}">${ok ? '✓ dentro da referência' : '✕ fora da referência'}</span></div></div>`; }).join('')}
+        <div class="bud"><div class="top"><b>Posto de lado</b><span class="num">${eur0(putInv + putSav)} · <b>${pct(tot.Receita ? (putInv + putSav) / tot.Receita : NaN)}</b></span></div>
+          <div class="small muted">Investimentos ${eur0(putInv)} · outras poupanças ${eur0(putSav)}</div></div>
+        <p class="small muted">Poupança é o que sobrou das receitas depois dos gastos. Posto de lado é o que investiu (Património) mais os movimentos de Poupança no período; se for maior, a diferença veio de dinheiro que já tinha guardado.</p>
         <p class="small muted">Necessidade ou desejo é definido por categoria em Ajustes.</p></section>
     </div>
     <div class="grid2">
