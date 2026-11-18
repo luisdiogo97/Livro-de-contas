@@ -144,7 +144,7 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 
 /* charts */
 .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
-.chart text { fill: var(--muted); font-size: 16px; font-family: var(--font-body); }
+.chart text { fill: var(--muted); font-size: var(--chart-fs, 16px); font-family: var(--font-body); }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: var(--ink-2); margin-bottom: 6px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 #tip[hidden], #toast[hidden] { display: none; }
@@ -217,6 +217,26 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 .patri .v { font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
 .gear { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; width: 42px; height: 42px; display: grid; place-items: center; cursor: pointer; color: var(--ink-2); flex: none; }
 .gear svg { width: 20px; height: 20px; }
+/* computer screens: side menu instead of the bottom bar, wider content, Início in two columns */
+.desk { display: none !important; }
+.home { display: grid; gap: 14px; }
+@media (min-width: 1000px) {
+  body { padding-left: 232px; }
+  .wrap { max-width: 1180px; padding-left: 32px; padding-right: 32px; padding-block: 28px 48px; }
+  nav.tabs { top: 0; right: auto; width: 232px; border-top: 0; border-right: 1px solid var(--line); padding: 22px 14px; }
+  nav.tabs .in { display: flex; flex-direction: column; gap: 4px; height: 100%; max-width: none; }
+  nav.tabs .desk { display: grid !important; }
+  nav.tabs .brand { display: block !important; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--ink); padding: 0 12px 18px; }
+  nav.tabs button { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; padding: 10px 12px; font-size: 0.95rem; border-radius: 10px; color: var(--ink-2); }
+  nav.tabs button svg { width: 20px; height: 20px; }
+  nav.tabs button:hover { background: var(--surface-2); }
+  nav.tabs button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  nav.tabs button.desk { margin-top: auto; }
+  .hello .gear { display: none; }
+  .home { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; gap: 18px; }
+  .stack, .grid2 { gap: 18px; }
+  #toast { left: calc(50% + 116px); bottom: 28px; }
+}
 @media (prefers-reduced-motion: no-preference) { .chip, .btn, .seg button { transition: background-color .15s, color .15s; } }
 </style>
 
@@ -617,7 +637,7 @@ function viewInicio() {
   return `
   <div class="hello"><div><h1>${greet}${name ? ', ' + esc(name) : ''}</h1><div class="sub">${esc(cap(dayLong(td)))}</div></div>
     <button class="gear" data-act="goto" data-v="ajustes" aria-label="Ajustes">${ic.gear}</button></div>
-  <div class="stack">
+  <div class="home"><div class="stack">
     ${syncBanner()}
     ${!allTx().length ? welcomeCard() : ''}
     <section class="home-hero">
@@ -640,6 +660,7 @@ function viewInicio() {
       <div class="card"><div class="label">Hoje</div><div class="v">${eur(todayV)}</div><div class="h">${todayN ? todayN + ' movimento' + (todayN > 1 ? 's' : '') : 'Nada registado'}</div></div>
       <div class="card"><div class="label">Últimos 7 dias</div><div class="v">${eur(weekV)}</div><div class="h">média ${eur(weekV / 7)}/dia</div></div>
     </div>
+    </div><div class="stack">
     <section class="card"><div class="cardhead"><h2>Para onde vai o dinheiro</h2><button class="btn ghost small" data-act="goto" data-v="mes">Ver mês</button></div>
       ${top.length ? `<div class="where">${top.map(([c, v], i) => `<div><div class="top"><span><i class="sw" style="background:${colors[i]}"></i>${esc(c)}</span><span class="num">${eur(v)}</span></div><div class="track"><i style="width:${(v / topMax * 100).toFixed(1)}%;background:${colors[i]}"></i></div></div>`).join('')}</div>` : '<p class="empty">Ainda sem despesas este mês.</p>'}
     </section>
@@ -648,7 +669,7 @@ function viewInicio() {
     </section>
     <button class="card patri" data-act="goto" data-v="patrimonio"><div><div class="label">Património</div><div class="v">${eur(net)}</div>
       <div class="small muted">${juroMes > 0 ? `As suas contas rendem cerca de ${eur(juroMes)} por mês` : 'Contas, poupanças e investimentos'}</div></div>${ic.chev}</button>
-  </div>`;
+  </div></div>`;
 }
 function viewRegistar() {
   syncSplit();
@@ -1206,7 +1227,9 @@ const ICONS = {
 };
 const TABS = [['inicio', 'Início'], ['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património']];
 function renderTabs() {
-  document.getElementById('tabs').innerHTML = TABS.map(([k, l]) => `<button type="button" data-tab="${k}" ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`).join('');
+  // On a computer screen the bar becomes a side menu, with the app name on top and Ajustes at the bottom.
+  const btn = ([k, l], cls) => `<button type="button" data-tab="${k}" ${cls ? `class="${cls}"` : ''} ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`;
+  document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + TABS.map(t => btn(t)).join('') + btn(['ajustes', 'Ajustes'], 'desk');
 }
 function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
@@ -1215,8 +1238,18 @@ function render() {
     ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
   document.getElementById('app').innerHTML = html;
   renderTabs();
+  fitCharts();
   if (aid) { const el = document.getElementById(aid); if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
 }
+// Chart labels are sized in SVG units, so on a wide screen they would grow with the chart.
+// Keep them at about 13px on screen (never bigger than on the phone).
+function fitCharts() {
+  document.querySelectorAll('.chart svg').forEach(s => {
+    const w = s.clientWidth, vw = s.viewBox && s.viewBox.baseVal ? s.viewBox.baseVal.width : 0;
+    if (w && vw) s.style.setProperty('--chart-fs', Math.max(8, Math.min(16, 13 * vw / w)).toFixed(1) + 'px');
+  });
+}
+let fitTimer; addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitCharts, 100); });
 function go(v) { view = v; F.confirmDel = false; render(); window.scrollTo(0, 0); try { localStorage.setItem('ldc-view', v); } catch (e) {} }
 
 // ---------- events ----------
