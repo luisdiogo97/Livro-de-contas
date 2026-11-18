@@ -250,6 +250,7 @@ const dayLong = s => new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'n
 const dayShort = s => new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' }).format(parseD(s)).replace('.', '');
 const daysInMonth = key => { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0).getDate(); };
 const parseAmount = s => { s = String(s || '').trim().replace(/\s|€/g, ''); if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); const v = parseFloat(s); return isFinite(v) ? Math.round(v * 100) / 100 : NaN; };
+const parseNum = s => { const v = parseAmount(s); if (!isFinite(v)) return v; s = String(s).trim().replace(/\s|€/g, ''); if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); };
 const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 const TYPES = ['Despesa', 'Conta fixa', 'Receita', 'Poupança', 'Dívida'];
@@ -267,6 +268,10 @@ const KIND_INFO = {
   PPR: { title: 'PPR', add: '+ Adicionar PPR', empty: 'Ainda não tem PPR.', key: 'ex.: PPR Save & Grow', name: 'ex.: nome da entidade gestora', fee: 'Comissão de gestão anual (%)', feeShort: 'comissão de gestão', feePh: '1,5', field: 'ter' },
   Outro: { title: 'Outros investimentos', add: '+ Adicionar investimento', empty: 'Fundos, obrigações, certificados de aforro ou outros.', key: 'ex.: Certificados de Aforro', name: 'ex.: série F', fee: 'Custo anual (%)', feeShort: 'custo', feePh: '0,5', field: 'ter' },
 };
+// ETFs and shares can also keep how many units you hold and the average price paid (units, avg).
+const UNIT_KINDS = ['ETF', 'Ação'];
+const fmtNum = (v, max) => (+v || 0).toLocaleString('pt-PT', { maximumFractionDigits: max });
+const numIn = (v, max) => v ? String(+(+v).toFixed(max)).replace('.', ',') : '';
 const KIND_NEW = { ETF: 'do novo ETF', 'Ação': 'da nova ação', Cripto: 'da nova cripto', PPR: 'do novo PPR', Outro: 'do novo investimento' };
 const KIND_ONE = { ETF: 'ETF', 'Ação': 'ação', Cripto: 'cripto', PPR: 'PPR', Outro: 'investimento' };
 const nextFor = k => { const n = (S.settings.next || {})[k]; return n != null ? +n || 0 : k === 'ETF' ? +S.settings.nextContribution || 0 : 0; };
@@ -378,7 +383,12 @@ function applyLink(tx, sign) {
   if (lk.e) {
     const sid = 'tx-' + tx.id;
     S.etfs.snaps = (S.etfs.snaps || []).filter(x => x.id !== sid);
-    if (sign > 0 && (S.etfs.etfs || []).some(e => e.key === lk.e)) S.etfs.snaps.push({ id: sid, d: tx.d, e: lk.e, inv: tx.v, val: Math.round((invLastVal(lk.e, tx.d) + tx.v) * 100) / 100 });
+    const def = (S.etfs.etfs || []).find(e => e.key === lk.e);
+    if (def && lk.q > 0) {
+      const units = +def.units || 0, cost = units * (+def.avg || 0) + sign * tx.v, nu = Math.max(0, units + sign * lk.q);
+      def.units = Math.round(nu * 1e6) / 1e6; def.avg = nu > 1e-9 ? Math.round(cost / nu * 1e6) / 1e6 : 0;
+    }
+    if (sign > 0 && def) S.etfs.snaps.push({ id: sid, d: tx.d, e: lk.e, inv: tx.v, val: Math.round((invLastVal(lk.e, tx.d) + tx.v) * 100) / 100 });
     saveEtfs();
   }
 }
@@ -412,7 +422,17 @@ function invBox() {
     <span class="label">Em que ${KIND_ONE[ch.kind]}?</span>
     <div class="chips">${invChips}<button type="button" class="chip" data-act="f-inv" data-v="+new" aria-pressed="${F.inv === '+new'}">${ch.kind === 'Ação' || ch.kind === 'Cripto' ? '+ Nova' : '+ Novo'}</button><button type="button" class="chip" data-act="f-inv" data-v="" aria-pressed="${!ch.e && F.inv !== '+new'}">Nenhum em especial</button></div>
     ${F.inv === '+new' ? `<div class="field"><label class="small" for="f-newinv">Nome ${KIND_NEW[ch.kind]}</label><input id="f-newinv" class="inp" style="width:100%" placeholder="${esc(KIND_INFO[ch.kind].key)}" value="${esc(F.newInv || '')}"><span class="small muted">Fica também no Património. Taxas e peso alvo pode pôr lá depois.</span></div>` : ''}
+    ${UNIT_KINDS.includes(ch.kind) && ch.e ? `<div class="field"><label class="small" for="f-price">Preço por unidade (€), opcional</label><input id="f-price" class="inp" style="width:100%" inputmode="decimal" placeholder="ex.: 98,40" value="${esc(F.price || '')}"><span class="small muted" id="inv-units">${unitsText(ch)}</span></div>` : ''}
   </div>`;
+}
+function unitsText(ch) {
+  const pr = parseNum(F.price || ''), amt = entryValue().v;
+  if (!(pr > 0)) return 'Com o preço, a app conta as unidades e o seu preço médio de compra.';
+  if (!(amt > 0)) return '';
+  const def = (S.etfs.etfs || []).find(e => e.key === ch.e), old = F.editing ? findTx(F.editing) : null;
+  const q = amt / pr; let units = def ? +def.units || 0 : 0, cost = units * (def ? +def.avg || 0 : 0);
+  if (old && old.lk && old.lk.e === ch.e && old.lk.q > 0) { units -= old.lk.q; cost -= old.v; }
+  return `Compra ${fmtNum(q, 4)} unidades. Fica com ${fmtNum(units + q, 4)}, a um preço médio de ${eur((cost + amt) / (units + q))}.`;
 }
 function addTx(item) {
   const key = monthKey(item.d);
@@ -925,10 +945,11 @@ function invRow(r) {
   const I = KIND_INFO[kindOf(r)], rate = +r[I.field] || 0, color = KIND_COLOR[kindOf(r)];
   const showW = !(r.w > 0.999 && !r.target);
   return `<div class="bud"><div class="top"><b>${esc(r.key)}</b><span class="num">${eur(r.val)} <span style="color:${r.gain < 0 ? 'var(--bad)' : 'var(--good)'}">${isFinite(r.g) ? (r.gain >= 0 ? '+' : '') + pct(r.g) : ''}</span></span></div>
+    ${r.units > 0 ? `<div class="small"><b>${fmtNum(r.units, 4)} ${r.units === 1 ? 'unidade' : 'unidades'}</b>${r.avg > 0 ? ` · preço médio <b>${eur(r.avg)}</b>` : ''}${r.val > 0 ? ` · agora ≈ ${eur(r.val / r.units)}` : ''}</div>` : ''}
     <div class="small muted">${[esc(r.name), rate ? I.feeShort + ' ' + pct2(rate) + '/ano' : '', r.inv ? 'investido ' + eur0(r.inv) : '', isFinite(r.ann) ? pct(r.ann) + '/ano (aprox.)' : ''].filter(Boolean).join(' · ')}</div>
     ${showW ? `<div class="track" data-tip="${esc(`Peso ${pct(r.w)} · alvo ${pct(r.target)}`)}"><i style="width:${(r.w * 100).toFixed(1)}%;background:${color}"></i></div>
     <div class="small"><span class="muted">Peso ${pct(r.w)}${r.target ? ' · alvo ' + pct(r.target) : ''}</span>${r.sug >= 0.5 ? ` · <b>próximo reforço: ${eur0(r.sug)}</b>` : ''}</div>` : ''}
-    ${UI.etfOpen === r.key ? etfEdit(r) : `<div><button class="btn ghost small" data-act="etf-open" data-key="${esc(r.key)}">Editar nome, taxas ou peso</button></div>`}</div>`;
+    ${UI.etfOpen === r.key ? etfEdit(r) : `<div><button class="btn ghost small" data-act="etf-open" data-key="${esc(r.key)}">${UNIT_KINDS.includes(kindOf(r)) ? 'Editar unidades, preço médio, taxas ou peso' : 'Editar nome, taxas ou peso'}</button></div>`}</div>`;
 }
 function invCard(kind) {
   const E = etfCalc(kind), I = KIND_INFO[kind], color = KIND_COLOR[kind], k = esc(kind);
@@ -969,6 +990,8 @@ function etfEdit(r, kind) {
     <div class="field"><label class="small" for="etfd-name">Descrição (opcional)</label><input id="etfd-name" value="${esc(t.name)}" placeholder="${esc(I.name)}"></div></div>
     <div class="row2"><div class="field"><label class="small" for="etfd-fee">${I.fee}, opcional</label><input id="etfd-fee" inputmode="decimal" value="${num(t[I.field])}" placeholder="${I.feePh}"></div>
     <div class="field"><label class="small" for="etfd-target">Peso alvo em ${I.title} (%), opcional</label><input id="etfd-target" inputmode="decimal" value="${num(t.target)}" placeholder="ex.: 50"></div></div>
+    ${UNIT_KINDS.includes(kd) ? `<div class="row2"><div class="field"><label class="small" for="etfd-units">Unidades que tem, opcional</label><input id="etfd-units" inputmode="decimal" value="${numIn(t.units, 6)}" placeholder="ex.: 12,5"></div>
+    <div class="field"><label class="small" for="etfd-avg">Preço médio de compra (€), opcional</label><input id="etfd-avg" inputmode="decimal" value="${numIn(t.avg, 4)}" placeholder="ex.: 98,40"></div></div>` : ''}
     ${r ? `<div class="field"><label class="small" for="etfd-kind">Tipo</label><select id="etfd-kind">${KINDS.map(x => `<option value="${x}" ${kd === x ? 'selected' : ''}>${KIND_INFO[x].title}</option>`).join('')}</select></div>` : `<input type="hidden" id="etfd-kind" value="${esc(kd)}">`}
     <div class="row2"><button class="btn" type="submit">${r ? 'Guardar' : 'Adicionar'}</button><button class="btn" type="button" data-act="etf-close">Cancelar</button></div>
     ${r ? `<button class="btn danger small" type="button" data-act="etf-del" data-key="${esc(r.key)}">${UI.confirmEtf ? 'Confirmar: remover e apagar os seus registos' : 'Remover'}</button>` : ''}
@@ -1163,7 +1186,7 @@ app.addEventListener('click', e => {
   else if (act === 'date') { F.date = v; render(); }
   else if (act === 'more-recent') { UI.recentMonths = UI.recentMonths ? UI.recentMonths + 1 : 2; render(); }
   else if (act === 'less-recent') { UI.recentMonths = 0; render(); }
-  else if (act === 'edit') { const t = findTx(b.dataset.id); if (!t) return; Object.assign(F, { editing: t.id, type: catType(t.c), amount: String(t.v).replace('.', ','), cat: t.c, date: t.d, note: t.n || '', confirmDel: false, acc: t.lk ? t.lk.a || '' : '', inv: t.lk ? t.lk.e || '' : '' }); go('registar'); }
+  else if (act === 'edit') { const t = findTx(b.dataset.id); if (!t) return; Object.assign(F, { editing: t.id, type: catType(t.c), amount: String(t.v).replace('.', ','), cat: t.c, date: t.d, note: t.n || '', confirmDel: false, acc: t.lk ? t.lk.a || '' : '', inv: t.lk ? t.lk.e || '' : '', price: t.lk && t.lk.p ? String(t.lk.p).replace('.', ',') : '' }); go('registar'); }
   else if (act === 'cancel-edit') { resetForm(); render(); }
   else if (act === 'del-edit') {
     if (!F.confirmDel) { F.confirmDel = true; render(); return; }
@@ -1206,6 +1229,7 @@ app.addEventListener('input', e => {
   if (id === 'f-amount') { F.amount = e.target.value; refreshSave(); }
   else if (id === 'f-note') F.note = e.target.value;
   else if (id === 'f-newinv') { F.newInv = e.target.value; refreshSave(); }
+  else if (id === 'f-price') { F.price = e.target.value; refreshSave(); }
   else if (id === 'f-split-pct') { SPL.pctText = e.target.value; const p = parseAmount(SPL.pctText); SPL.share = p > 0 && p < 100 ? p / 100 : NaN; refreshSave(); }
 });
 app.addEventListener('change', e => {
@@ -1229,9 +1253,9 @@ function refreshSave() {
   btn.disabled = !ok; if (!F.editing) btn.textContent = ok ? `Guardar ${eur(amt)}` : 'Guardar';
   const res = document.getElementById('split-res'); if (res) res.innerHTML = splitResult();
   const inp = document.getElementById('f-amount'); if (inp) inp.setAttribute('aria-label', splitActive() ? 'Valor total em euros' : 'Valor em euros');
-  const ia = document.getElementById('inv-after'), ch = ia && invChoice(); if (ch) ia.innerHTML = invAfter(ch);
+  const ia = document.getElementById('inv-after'), iu = document.getElementById('inv-units'), ch = (ia || iu) && invChoice(); if (ch && ia) ia.innerHTML = invAfter(ch); if (ch && iu) iu.innerHTML = unitsText(ch);
 }
-function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false, acc: undefined, inv: undefined, newInv: '' }); Object.assign(SPL, { on: false, auto: false, catSeen: '' }); }
+function resetForm() { Object.assign(F, { amount: '', cat: '', note: '', date: today(), editing: null, confirmDel: false, acc: undefined, inv: undefined, newInv: '', price: '' }); Object.assign(SPL, { on: false, auto: false, catSeen: '' }); }
 app.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target;
@@ -1240,6 +1264,7 @@ app.addEventListener('submit', e => {
     if (!(v > 0) || !F.cat) return;
     const note = ev.split ? splitNote(F.note.trim(), ev.total, SPL.share) : F.note.trim();
     const ch = invChoice();
+    if (F.price && F.price.trim() && !(parseNum(F.price) > 0)) { toast('Preço por unidade inválido: use um número, ex.: 98,40.'); return; }
     if (ch && ch.isNew) {
       if (!ch.nm) { toast(`Escreva o nome ${KIND_NEW[ch.kind]} ou escolha um da lista.`); const el = document.getElementById('f-newinv'); if (el) el.focus(); return; }
       if (S.etfs.etfs.some(x => x.key.toLowerCase() === ch.nm.toLowerCase())) { toast('Já existe um investimento com esse nome noutra zona do Património.'); return; }
@@ -1247,7 +1272,7 @@ app.addEventListener('submit', e => {
     }
     const withSplit = it => {
       const o = { ...it }; delete o.tt; delete o.sp; delete o.lk; if (ev.split) { o.tt = ev.total; o.sp = SPL.share; }
-      if (ch && (ch.a || ch.e)) { o.lk = { a: ch.a, e: ch.e }; const acc = ch.accs.find(x => x.id === ch.a); o.m = acc ? acc.bank : ''; } else if (it.lk) o.m = '';
+      if (ch && (ch.a || ch.e)) { o.lk = { a: ch.a, e: ch.e }; const pr = parseNum(F.price || ''); if (ch.e && UNIT_KINDS.includes(ch.kind) && pr > 0) { o.lk.p = pr; o.lk.q = Math.round(o.v / pr * 1e6) / 1e6; } const acc = ch.accs.find(x => x.id === ch.a); o.m = acc ? acc.bank : ''; } else if (it.lk) o.m = '';
       return o;
     };
     if (ch && ch.a && ch.a !== S.settings.lastAcc) { S.settings.lastAcc = ch.a; saveSettings(); }
@@ -1278,7 +1303,9 @@ app.addEventListener('submit', e => {
     if (!(ter >= 0) || !(target >= 0) || target > 100) { toast('Taxa ou peso alvo inválido: use números, ex.: 0,2 e 60.'); return; }
     if (key !== old && S.etfs.etfs.some(e => e.key.toLowerCase() === key.toLowerCase())) { toast('Já existe um investimento com esse nome curto.'); return; }
     const kind = KINDS.includes(g('etfd-kind')) ? g('etfd-kind') : 'ETF', prev = S.etfs.etfs.find(e => e.key === old) || {};
-    const def = { key, kind, name: g('etfd-name'), ter: KIND_INFO[kind].field === 'ter' ? ter / 100 : (prev.ter || 0), div: KIND_INFO[kind].field === 'div' ? ter / 100 : (prev.div || 0), target: target / 100 };
+    const hasU = !!document.getElementById('etfd-units'), units = hasU && g('etfd-units') ? parseNum(g('etfd-units')) : 0, avg = hasU && g('etfd-avg') ? parseNum(g('etfd-avg')) : 0;
+    if (!(units >= 0) || !(avg >= 0)) { toast('Unidades ou preço médio inválido: use números, ex.: 12,5 e 98,40.'); return; }
+    const def = { ...(hasU ? { units, avg } : { units: prev.units || 0, avg: prev.avg || 0 }), key, kind, name: g('etfd-name'), ter: KIND_INFO[kind].field === 'ter' ? ter / 100 : (prev.ter || 0), div: KIND_INFO[kind].field === 'div' ? ter / 100 : (prev.div || 0), target: target / 100 };
     if (old) { S.etfs.etfs = S.etfs.etfs.map(e => e.key === old ? def : e); if (key !== old) { S.etfs.snaps = S.etfs.snaps.map(x => x.e === old ? { ...x, e: key } : x); for (const k of Object.keys(S.months)) if (S.months[k].some(x => x.lk && x.lk.e === old)) { S.months[k] = S.months[k].map(x => x.lk && x.lk.e === old ? { ...x, lk: { ...x.lk, e: key } } : x); saveMonth(k); } } }
     else S.etfs.etfs = [...S.etfs.etfs, def];
     UI.etfOpen = null; saveEtfs(); render();
@@ -1381,8 +1408,8 @@ function workbookData() {
     .concat(accs.length ? [[], [{ v: 'Total', s: 'b' }, '', { v: accs.reduce((s, a) => s + (+a.balance || 0), 0), s: 'beur' }, '', '', '', '', { v: accs.reduce((s, a) => s + accCalc(a).year, 0), s: 'beur' }, { v: accs.reduce((s, a) => s + accCalc(a).month, 0), s: 'beur' }]] : []);
   const histo = [H(['Data', 'Total em contas'])].concat((S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d)).map(h => [{ v: h.d, s: 'date' }, E(h.total)]));
   const EC = etfCalc();
-  const etfs = [H(['Investimento', 'Tipo', 'Descrição', 'Custo anual', 'Dividendos', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo'])]
-    .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.div || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '']));
+  const etfs = [H(['Investimento', 'Tipo', 'Descrição', 'Custo anual', 'Dividendos', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo', 'Unidades', 'Preço médio'])]
+    .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.div || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '', r.units > 0 ? +r.units : '', r.avg > 0 ? E(+r.avg) : '']));
   const snaps = [H(['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'])].concat((S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.e.localeCompare(b.e)).map(x => [{ v: x.d, s: 'date' }, x.e, E(+x.inv || 0), E(+x.val || 0)]));
   return [
     { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
@@ -1390,7 +1417,7 @@ function workbookData() {
     { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
     { name: 'Contas', cols: [18, 20, 13, 9, 12, 13, 18, 20, 20], rows: contas, filterTo: accs.length + 1 },
     { name: 'Contas histórico', cols: [12, 16], rows: histo },
-    { name: 'Investimentos', cols: [14, 10, 40, 12, 11, 10, 13, 13, 12, 10, 11, 14], rows: etfs },
+    { name: 'Investimentos', cols: [14, 10, 40, 12, 11, 10, 13, 13, 12, 10, 11, 14, 11, 12], rows: etfs },
     { name: 'Investimentos registos', cols: [12, 14, 20, 16], rows: snaps },
   ];
 }
