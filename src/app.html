@@ -852,7 +852,7 @@ function viewMes() {
   const byDay = {}; for (const x of items.slice().reverse()) (byDay[x.d] = byDay[x.d] || []).push(x);
   const days = Object.keys(byDay).sort().reverse();
   return `
-  <header class="top"><h1>Mês</h1>${xlBtn()}</header>
+  <header class="top"><h1>Mês</h1></header>
   <div class="stack">
     <div class="monthnav"><button class="iconbtn" data-act="prev-m" aria-label="Mês anterior" ${key <= first ? 'disabled' : ''}>‹</button><b>${esc(monthLong(key))}</b><button class="iconbtn" data-act="next-m" aria-label="Mês seguinte" ${key >= monthKey(today()) ? 'disabled' : ''}>›</button></div>
     <div class="kpis k4">
@@ -956,7 +956,7 @@ function viewAno() {
     </div>`;
   if (!items.length) return `<header class="top"><h1>Ano</h1></header><div class="stack">${chips}<section class="card"><p class="empty">Ainda não há movimentos neste período. Os totais, as médias mensais e os gráficos aparecem aqui assim que registar despesas e receitas.</p></section></div>`;
   return `
-  <header class="top"><h1>Ano</h1>${xlBtn()}</header>
+  <header class="top"><h1>Ano</h1></header>
   <div class="stack">
     ${chips}
     <div class="kpis k3">
@@ -1440,7 +1440,6 @@ app.addEventListener('click', e => {
   else if (act === 'cat-del' && allTx().some(x => x.c === S.cats[+b.dataset.i]?.name)) { const i = +b.dataset.i; UI.catMove = UI.catMove === i ? null : i; render(); const el = document.getElementById('cm-to-' + i); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
   else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; UI.catMove = null; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
-  else if (act === 'export-per') exportPeriod();
   else if (act === 'backup') doBackup();
   else if (act === 'sync-on') window.LDC.sync.connect();
   else if (act === 'sync-now') window.LDC.sync.syncNow();
@@ -1610,6 +1609,7 @@ const XL_STYLES = (() => {
     '<font><sz val="9"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>',
     '<font><b/><sz val="13"/><color rgb="FF1E3A8A"/><name val="Calibri"/><family val="2"/></font>',
     '<font><sz val="11"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><u/><sz val="12"/><color rgb="FF1F5FD1"/><name val="Calibri"/><family val="2"/></font>',
   ];
   const fills = ['none', 'gray125', 'FF1F5FD1', 'FFF3F6FB', 'FFE8EEFB', 'FFFFF4CC'].map(c => c === 'none' || c === 'gray125' ? `<fill><patternFill patternType="${c}"/></fill>` : `<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`);
   const borders = [
@@ -1623,7 +1623,7 @@ const XL_STYLES = (() => {
     b: [0, 2, 0, 0], tot: [0, 2, 4, 1], teur: [164, 2, 4, 1], tpct: [168, 2, 4, 1], tint: [1, 2, 4, 1],
     title: [0, 3, 0, 0], sub: [0, 4, 0, 0], sec: [0, 7, 0, 0], calc: [0, 8, 0, 0], cmonth: [166, 8, 0, 0],
     kl: [0, 6, 3, 0, 'left'], kv: [167, 5, 3, 0, 'left'], kp: [168, 5, 3, 0, 'left'], kn: [1, 5, 3, 0, 'left'],
-    input: [166, 2, 5, 2, 'center'], wrap: [0, 4, 0, 0, 'wrap'],
+    input: [166, 2, 5, 2, 'center'], idate: [165, 2, 5, 2, 'center'], wrap: [0, 4, 0, 0, 'wrap'], btn: [0, 9, 4, 1, 'center'], lbl: [0, 8, 0, 0, 'right'],
   };
   const names = Object.keys(defs), idx = {};
   names.forEach((k, i) => { idx[k] = i; });
@@ -1677,7 +1677,7 @@ function xlsxFile(book) {
     const o = typeof c === 'object' ? c : { v: c }, ref = xlCol(i) + r, st = o.s ? ` s="${XI[o.s]}"` : '';
     const f = o.f ? `<f>${xlEsc(o.f)}</f>` : '';
     let v = o.v;
-    if ((o.s === 'date' || o.s === 'month' || o.s === 'input' || o.s === 'cmonth') && typeof v === 'string' && /^\d{4}-\d\d/.test(v)) v = xlSerial(v);
+    if ((o.s === 'date' || o.s === 'month' || o.s === 'input' || o.s === 'idate' || o.s === 'cmonth') && typeof v === 'string' && /^\d{4}-\d\d/.test(v)) v = xlSerial(v);
     if (typeof v === 'number') return isFinite(v) ? `<c r="${ref}"${st}>${f}<v>${Math.round(v * 1e6) / 1e6}</v></c>` : (f ? `<c r="${ref}"${st} t="str">${f}<v></v></c>` : `<c r="${ref}"${st}/>`);
     if (v == null || v === '') return f ? `<c r="${ref}"${st} t="str">${f}<v></v></c>` : (o.s ? `<c r="${ref}"${st}/>` : '');
     if (f) return `<c r="${ref}"${st} t="str">${f}<v>${xlEsc(v)}</v></c>`;
@@ -1688,12 +1688,12 @@ function xlsxFile(book) {
     let tableParts = '', drawing = '';
     if (sh.table) {
       tableN++; rels.push(`<Relationship Id="rId${rels.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table${tableN}.xml"/>`);
-      const t = sh.table, last = Math.max(2, t.rows + 1), ref = `A1:${xlCol(t.cols.length - 1)}${last}`;
+      const t = sh.table, top = t.top || 1, last = top + Math.max(1, t.rows), ref = `A${top}:${xlCol(t.cols.length - 1)}${last}`;
       files.push([`xl/tables/table${tableN}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${tableN}" name="${t.name}" displayName="${t.name}" ref="${ref}" totalsRowShown="0"><autoFilter ref="${ref}"/><tableColumns count="${t.cols.length}">${t.cols.map((c, i) => `<tableColumn id="${i + 1}" name="${xlEsc(c.name)}"${c.calc ? `><calculatedColumnFormula>${xlEsc(c.calc)}</calculatedColumnFormula></tableColumn>` : '/>'}`).join('')}</tableColumns><tableStyleInfo name="${t.style || 'TableStyleMedium2'}" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>`]);
       ct.push(`<Override PartName="/xl/tables/table${tableN}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`);
       tableParts = `<tableParts count="1"><tablePart r:id="rId${rels.length}"/></tableParts>`;
-      if (!t.rows) sh.rows[1] = sh.rows[1] || [];
+      if (!t.rows) sh.rows[top] = sh.rows[top] || [];
     }
     if (sh.charts && sh.charts.length) {
       drawN++; rels.push(`<Relationship Id="rId${rels.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${drawN}.xml"/>`);
@@ -1713,7 +1713,7 @@ function xlsxFile(book) {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${dRels.join('')}</Relationships>`]);
       ct.push(`<Override PartName="/xl/drawings/drawing${drawN}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
     }
-    const fr = sh.freeze || (sh.table ? { r: 1, c: 0 } : null);
+    const fr = sh.freeze || (sh.table ? { r: sh.table.top || 1, c: 0 } : null);
     const pane = fr && (fr.r || fr.c) ? `<pane${fr.c ? ` xSplit="${fr.c}"` : ''}${fr.r ? ` ySplit="${fr.r}"` : ''} topLeftCell="${xlCol(fr.c || 0)}${(fr.r || 0) + 1}" activePane="${fr.r && fr.c ? 'bottomRight' : fr.r ? 'bottomLeft' : 'topRight'}" state="frozen"/>` : '';
     const rowsXml = sh.rows.map((row, ri) => {
       const ht = sh.heights && sh.heights[ri + 1];
@@ -1726,7 +1726,7 @@ function xlsxFile(book) {
       : `<cfRule type="cellIs" dxfId="${x.dxf}" priority="${++prio}" operator="${x.op}"><formula>${xlEsc(x.v)}</formula>${x.v2 != null ? `<formula>${xlEsc(x.v2)}</formula>` : ''}</cfRule>`).join('')}</conditionalFormatting>`).join('');
     const dv = sh.valid && sh.valid.length ? `<dataValidations count="${sh.valid.length}">${sh.valid.map(d => `<dataValidation type="${d.type}"${d.op ? ` operator="${d.op}"` : ''} allowBlank="1" showInputMessage="1" showErrorMessage="1" errorTitle="${xlEsc(d.title)}" error="${xlEsc(d.error)}" promptTitle="${xlEsc(d.title)}" prompt="${xlEsc(d.prompt || '')}" sqref="${d.ref}"><formula1>${xlEsc(d.f)}</formula1></dataValidation>`).join('')}</dataValidations>` : '';
     files.push([`xl/worksheets/sheet${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr>${sh.tab ? `<tabColor rgb="FF${sh.tab}"/>` : ''}<pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView ${sh.noGrid ? 'showGridLines="0" ' : ''}${si === 0 ? 'tabSelected="1" ' : ''}workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsXml}</sheetData>${merges}${cf}${dv}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>${drawing}${tableParts}</worksheet>`]);
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr>${sh.tab ? `<tabColor rgb="FF${sh.tab}"/>` : ''}<pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView ${sh.noGrid ? 'showGridLines="0" ' : ''}${si === 0 ? 'tabSelected="1" ' : ''}workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"${sh.hide && sh.hide.includes(i) ? ' hidden="1"' : ''}/>`).join('')}</cols><sheetData>${rowsXml}</sheetData>${merges}${cf}${dv}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>${drawing}${tableParts}</worksheet>`]);
     ct.push(`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
     if (rels.length) files.push([`xl/worksheets/_rels/sheet${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`]);
@@ -1769,7 +1769,12 @@ function workbookData(win) {
   const curM = monthKey(today()), anaM = months.includes(curM) ? curM : (dataKeys[dataKeys.length - 1] || months[months.length - 1] || curM);
   const byM = {}; for (const x of tx) (byM[x.d.slice(0, 7)] = byM[x.d.slice(0, 7)] || []).push(x);
   const tm = k => totalsOf(byM[k] || []);
-  const nMonths = Math.max(1, months.length);
+  const nMonths = Math.max(1, months.filter(k => (byM[k] || []).length).length);
+  // period under analysis (Painel D5:D6): by default the whole file
+  const pIni = months.length ? months[0] + '-01' : today(), pFim = months.length ? months[months.length - 1] + '-' + pad(daysInMonth(months[months.length - 1])) : today();
+  const txP = tx.filter(x => x.d >= pIni && x.d <= pFim);
+  const perCat = {}; for (const x of txP) perCat[x.c] = (perCat[x.c] || 0) + x.v;
+  const nPer = (+pFim.slice(0, 4) - +pIni.slice(0, 4)) * 12 + (+pFim.slice(5, 7) - +pIni.slice(5, 7)) + 1;
 
   // ---- Movimentos (table tMov): A Data, B Categoria, C Valor, D Nota, E Meio, F Tipo, G Mês, H Natureza
   const MOV = 'Movimentos', NR = Math.max(5000, tx.length + 2000);
@@ -1777,18 +1782,25 @@ function workbookData(win) {
   const F_TIPO = `IFERROR(INDEX('Categorias'!$B:$B,MATCH(${TR('Categoria')},'Categorias'!$A:$A,0)),"")`;
   const F_MES = `IF(${TR('Data')}="","",DATE(YEAR(${TR('Data')}),MONTH(${TR('Data')}),1))`;
   const F_NAT = `IFERROR(INDEX('Categorias'!$C:$C,MATCH(${TR('Categoria')},'Categorias'!$A:$A,0))&"","")`;
-  const movRows = [H(['Data', 'Categoria', 'Valor', 'Nota', 'Meio', 'Tipo', 'Mês', 'Natureza'])].concat(tx.map((x, i) => {
+  // rows 1-3: title, a link that jumps to the first free row under the table, and how to use it; the table starts at row 4
+  const lastD = tx.length ? tx[tx.length - 1].d : '';
+  const movTop = [
+    [{ v: 'Movimentos', s: 'title' }, null, { f: `HYPERLINK("#'${MOV}'!A"&(ROWS(tMovimentos)+5),"➕  Adicionar movimento")`, v: '➕  Adicionar movimento', s: 'btn' }, { s: 'btn' }, { v: 'Último movimento', s: 'lbl' }, { f: 'MAX(tMovimentos[Data])', v: lastD, s: 'date' }],
+    [{ v: 'Carregue em "Adicionar movimento": vai direto à primeira linha livre da tabela. Escreva a data, escolha a categoria na lista e o valor (a nota e o meio são opcionais). O tipo, o mês e a natureza preenchem-se sozinhos.', s: 'wrap' }],
+    [],
+  ];
+  const movRows = [...movTop, H(['Data', 'Categoria', 'Valor', 'Nota', 'Meio', 'Tipo', 'Mês', 'Natureza'])].concat(tx.map((x, i) => {
     void i;
     return [{ v: x.d, s: 'date' }, x.c, { v: r2(x.v), s: 'eur' }, x.n || '', x.m || '', { f: F_TIPO, v: catType(x.c), s: 'calc' }, { f: F_MES, v: x.d.slice(0, 7), s: 'cmonth' }, { f: F_NAT, v: catOf(x.c).nature || '', s: 'calc' }];
   }));
   const movSheet = {
-    name: MOV, tab: '2E9D6A', cols: [12, 24, 12, 36, 16, 13, 11, 14], rows: movRows,
-    table: { name: 'tMovimentos', rows: tx.length, cols: [{ name: 'Data' }, { name: 'Categoria' }, { name: 'Valor' }, { name: 'Nota' }, { name: 'Meio' },
+    name: MOV, tab: '2E9D6A', cols: [12, 24, 12, 36, 16, 13, 11, 14], rows: movRows, merges: ['A1:B1', 'C1:D1', 'A2:H2'], heights: { 1: 34, 2: 34 },
+    table: { name: 'tMovimentos', top: 4, rows: tx.length, cols: [{ name: 'Data' }, { name: 'Categoria' }, { name: 'Valor' }, { name: 'Nota' }, { name: 'Meio' },
       { name: 'Tipo', calc: F_TIPO }, { name: 'Mês', calc: F_MES }, { name: 'Natureza', calc: F_NAT }] },
     valid: [
-      { type: 'date', op: 'greaterThan', f: '36526', ref: `A2:A${NR}`, title: 'Data', prompt: 'Data do movimento, ex.: 19/11/2026', error: 'Escreva uma data válida, ex.: 19/11/2026.' },
-      { type: 'list', f: 'ListaCategorias', ref: `B2:B${NR}`, title: 'Categoria', prompt: 'Escolha da lista. Para uma nova, acrescente-a na folha Categorias.', error: 'Escolha uma categoria da lista (folha Categorias).' },
-      { type: 'decimal', op: 'greaterThan', f: '0', ref: `C2:C${NR}`, title: 'Valor', prompt: 'Valor em euros, sempre positivo. O tipo da categoria diz se entra ou sai.', error: 'O valor tem de ser um número maior que zero.' },
+      { type: 'date', op: 'greaterThan', f: '36526', ref: `A5:A${NR}`, title: 'Data', prompt: 'Data do movimento, ex.: 19/11/2026', error: 'Escreva uma data válida, ex.: 19/11/2026.' },
+      { type: 'list', f: 'ListaCategorias', ref: `B5:B${NR}`, title: 'Categoria', prompt: 'Escolha da lista. Para uma nova, acrescente-a na folha Categorias.', error: 'Escolha uma categoria da lista (folha Categorias).' },
+      { type: 'decimal', op: 'greaterThan', f: '0', ref: `C5:C${NR}`, title: 'Valor', prompt: 'Valor em euros, sempre positivo. O tipo da categoria diz se entra ou sai.', error: 'O valor tem de ser um número maior que zero.' },
     ],
   };
 
@@ -1799,17 +1811,21 @@ function workbookData(win) {
   const catNames = [...new Set([...S.cats.slice().sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type)).map(c => c.name), ...Object.keys(totCat)])];
   const CT = c => `tCategorias[[#This Row],[${c}]]`;
   const CF = [`SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')},'${MOV}'!$G:$G,MesAnalise)`, `IF(${CT('Orçamento mensal')}>0,${CT('No mês em análise')}/${CT('Orçamento mensal')},"")`,
-    `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')})`, `${CT('Total')}/NMeses`, `COUNTIF('${MOV}'!$B:$B,${CT('Categoria')})`];
-  const catRows = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'No mês em análise', '% do orçamento', 'Total', 'Média mensal', 'Movimentos'])].concat(catNames.map((c, i) => {
-    void i; const k = catOf(c), b = +k.budget || 0, m = spentIn(c, anaM), t = totCat[c] || 0;
+    `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')})`, `${CT('Total')}/NMeses`, `COUNTIF('${MOV}'!$B:$B,${CT('Categoria')})`,
+    `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')},'${MOV}'!$A:$A,">="&Inicio,'${MOV}'!$A:$A,"<="&Fim)`,
+    `IF(AND(OR(${CT('Tipo')}="Despesa",${CT('Tipo')}="Conta fixa",${CT('Tipo')}="Dívida"),${CT('No período em análise')}>0),${CT('No período em análise')}+ROW()/1000000,0)`];
+  const catRows = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'No mês em análise', '% do orçamento', 'Total', 'Média mensal', 'Movimentos', 'No período em análise', 'Ordem'])].concat(catNames.map((c, i) => {
+    const k = catOf(c), b = +k.budget || 0, m = spentIn(c, anaM), t = totCat[c] || 0, tp = perCat[c] || 0;
     return [c, catType(c), k.nature || '', { v: b, s: 'eur' }, { f: CF[0], v: r2(m), s: 'eur' }, { f: CF[1], v: b > 0 ? m / b : '', s: 'pct' },
-      { f: CF[2], v: r2(t), s: 'eur' }, { f: CF[3], v: r2(t / nMonths), s: 'eur' }, { f: CF[4], v: cntCat[c] || 0, s: 'int' }];
+      { f: CF[2], v: r2(t), s: 'eur' }, { f: CF[3], v: r2(t / nMonths), s: 'eur' }, { f: CF[4], v: cntCat[c] || 0, s: 'int' },
+      { f: CF[5], v: r2(tp), s: 'eur' }, { f: CF[6], v: SPEND.includes(catType(c)) && tp > 0 ? r2(tp) + (i + 2) / 1e6 : 0 }];
   }));
   const nC = catNames.length;
   const catSheet = {
-    name: 'Categorias', tab: '8B5CF6', cols: [24, 13, 14, 17, 18, 15, 14, 14, 12], rows: catRows,
+    name: 'Categorias', tab: '8B5CF6', cols: [24, 13, 14, 17, 18, 15, 14, 14, 12, 20, 8], hide: [10], rows: catRows,
     table: { name: 'tCategorias', rows: nC, style: 'TableStyleMedium7', cols: [{ name: 'Categoria' }, { name: 'Tipo' }, { name: 'Natureza' }, { name: 'Orçamento mensal' },
-      { name: 'No mês em análise', calc: CF[0] }, { name: '% do orçamento', calc: CF[1] }, { name: 'Total', calc: CF[2] }, { name: 'Média mensal', calc: CF[3] }, { name: 'Movimentos', calc: CF[4] }] },
+      { name: 'No mês em análise', calc: CF[0] }, { name: '% do orçamento', calc: CF[1] }, { name: 'Total', calc: CF[2] }, { name: 'Média mensal', calc: CF[3] }, { name: 'Movimentos', calc: CF[4] },
+      { name: 'No período em análise', calc: CF[5] }, { name: 'Ordem', calc: CF[6] }] },
     valid: [
       { type: 'list', f: '"' + TYPES.join(',') + '"', ref: 'B2:B500', title: 'Tipo', prompt: 'Receita entra; os outros tipos saem.', error: 'Escolha um tipo da lista.' },
       { type: 'list', f: '"Necessidade,Desejo"', ref: 'C2:C500', title: 'Natureza', prompt: 'Para a regra 50/30/20 (só gastos).', error: 'Escolha Necessidade ou Desejo.' },
@@ -1858,44 +1874,53 @@ function workbookData(win) {
   P[0] = [null, { v: 'Livro de Contas' + (name ? ' · ' + name : ''), s: 'title' }];
   const span = months.length ? `${monthLong(months[0])} a ${monthLong(months[months.length - 1])}` : 'sem movimentos';
   P[1] = [null, { v: `Exportado a ${dayShort(today())} ${today().slice(0, 4)} · ${span} · ${tx.length} movimentos`, s: 'sub' }];
-  P[3] = [null, { v: 'Mês em análise', s: 'b' }, null, { v: anaM, s: 'input' }, { s: 'input' }, { v: 'Mude este mês (ex.: 01/10/2026) e os números do mês e os orçamentos atualizam-se.', s: 'sub' }];
+  // the choices: a month from a drop-down list, and a period from a start date to an end date
+  P[3] = [null, { v: 'Mês em análise', s: 'b' }, null, { v: anaM, s: 'input' }, { s: 'input' }, { v: 'Escolha o mês na lista (seta ao lado da célula).', s: 'sub' }];
+  P[4] = [null, { v: 'Período em análise', s: 'b' }, { v: 'de', s: 'lbl' }, { v: pIni, s: 'idate' }, { v: 'até', s: 'lbl' }, { v: pFim, s: 'idate' }, { v: 'Escreva as datas, ex.: 01/01/2026 e 31/12/2026.', s: 'sub' }];
   M.push('D4:E4');
-  const sumMes = t => `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$G:$G,MesAnalise,'${MOV}'!$F:$F,"${t}")`;
-  const sumAll = t => `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$F:$F,"${t}")`;
-  const ta = tm(anaM);
-  P[5] = [null, { v: 'Mês em análise', s: 'sec' }];
-  kpiRow(7, [['Receitas', sumMes('Receita'), r2(ta.Receita)], ['Gastos', `${sumMes('Despesa')}+${sumMes('Conta fixa')}+${sumMes('Dívida')}`, r2(ta.gastos)],
-    ['Sobrou', 'B8-D8', r2(ta.poupado)], ['Taxa de poupança', 'IF(B8>0,F8/B8,"")', ta.Receita > 0 ? ta.taxa : '', 'kp']]);
+  const MV = c => `'${MOV}'!$${c}:$${c}`;
+  const sumMes = t => `SUMIFS(${MV('C')},${MV('G')},MesAnalise,${MV('F')},"${t}")`;
+  const sumPer = t => `SUMIFS(${MV('C')},${MV('F')},"${t}",${MV('A')},">="&Inicio,${MV('A')},"<="&Fim)`;
+  const ta = tm(anaM), tp = totalsOf(txP);
+  P[6] = [null, { v: 'Mês em análise', s: 'sec' }];
+  kpiRow(8, [['Receitas', sumMes('Receita'), r2(ta.Receita)], ['Gastos', `${sumMes('Despesa')}+${sumMes('Conta fixa')}+${sumMes('Dívida')}`, r2(ta.gastos)],
+    ['Sobrou', 'B9-D9', r2(ta.poupado)], ['Taxa de poupança', 'IF(B9>0,F9/B9,"")', ta.Receita > 0 ? ta.taxa : '', 'kp']]);
   const budAll = budgetOf('Despesa') + budgetOf('Conta fixa');
-  kpiRow(10, [['Orçamento do mês (despesas + contas fixas)', `SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Despesa")+SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Conta fixa")`, r2(budAll)],
+  kpiRow(11, [['Orçamento do mês (despesas + contas fixas)', `SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Despesa")+SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Conta fixa")`, r2(budAll)],
     ['Gasto face ao orçamento', `${sumMes('Despesa')}+${sumMes('Conta fixa')}`, r2(ta.Despesa + ta['Conta fixa'])],
-    ['Margem', 'B11-D11', r2(budAll - ta.Despesa - ta['Conta fixa'])], ['Posto de lado', sumMes('Poupança'), r2(ta.Poupança)]]);
-  P[12] = [null, { v: 'Todo o período do ficheiro', s: 'sec' }];
-  kpiRow(14, [['Receitas', sumAll('Receita'), r2(all.Receita)], ['Gastos', `${sumAll('Despesa')}+${sumAll('Conta fixa')}+${sumAll('Dívida')}`, r2(all.gastos)],
-    ['Sobrou', 'B15-D15', r2(all.poupado)], ['Taxa de poupança', 'IF(B15>0,F15/B15,"")', all.Receita > 0 ? all.taxa : '', 'kp']]);
-  kpiRow(17, [['Receita média por mês', 'B15/NMeses', r2(all.Receita / nMonths)], ['Gasto médio por mês', 'D15/NMeses', r2(all.gastos / nMonths)],
-    ['Sobra média por mês', 'F15/NMeses', r2(all.poupado / nMonths)], ['Meses', 'NMeses', nMonths, 'kn']]);
-  let row = 19;
+    ['Margem', 'B12-D12', r2(budAll - ta.Despesa - ta['Conta fixa'])], ['Posto de lado', sumMes('Poupança'), r2(ta.Poupança)]]);
+  P[13] = [null, { v: 'Período em análise', s: 'sec' }];
+  kpiRow(15, [['Receitas', sumPer('Receita'), r2(tp.Receita)], ['Gastos', `${sumPer('Despesa')}+${sumPer('Conta fixa')}+${sumPer('Dívida')}`, r2(tp.gastos)],
+    ['Sobrou', 'B16-D16', r2(tp.poupado)], ['Taxa de poupança', 'IF(B16>0,F16/B16,"")', tp.Receita > 0 ? tp.taxa : '', 'kp']]);
+  kpiRow(18, [['Receita média por mês', 'B16/NMesesPeriodo', r2(tp.Receita / nPer)], ['Gasto médio por mês', 'D16/NMesesPeriodo', r2(tp.gastos / nPer)],
+    ['Sobra média por mês', 'F16/NMesesPeriodo', r2(tp.poupado / nPer)], ['Meses no período', 'NMesesPeriodo', nPer, 'kn']]);
+  let row = 20;
   const accs = S.accounts.accounts || [], EC = etfCalc();
+  const heights = { 1: 34, 9: 30, 12: 30, 16: 30, 19: 30 };
   if (full) {
     P[row] = [null, { v: 'Património', s: 'sec' }];
     const inAcc = accs.reduce((s, a) => s + (+a.balance || 0), 0);
-    kpiRow(row + 2, [['Em contas', 'SUM(tContas[Saldo])', r2(inAcc)], ['Investido', 'SUM(tInvest[Investido])', r2(EC.inv || EC.rows.reduce((s, r) => s + r.inv, 0))],
+    kpiRow(row + 2, [['Em contas', 'SUM(tContas[Saldo])', r2(inAcc)], ['Investido', 'SUM(tInvest[Investido])', r2(EC.rows.reduce((s, r) => s + r.inv, 0))],
       ['Valor dos investimentos', 'SUM(tInvest[Valor atual])', r2(EC.rows.reduce((s, r) => s + r.val, 0))], ['Património total', `B${row + 3}+F${row + 3}`, r2(inAcc + EC.rows.reduce((s, r) => s + r.val, 0))]]);
+    heights[row + 3] = 30;
     row += 4;
   }
-  P[row] = [null, { v: 'Para registar no Excel: na folha Movimentos, escreva na primeira linha vazia logo a seguir à tabela (data, categoria da lista, valor). O tipo, o mês e a natureza preenchem-se sozinhos e este painel atualiza. Estes dados não voltam para a app.', s: 'wrap' }];
+  P[row] = [null, { v: 'Os gráficos das categorias e de "para onde foi o dinheiro" seguem o período em análise. Os gráficos mês a mês mostram os últimos 12 meses. Para registar movimentos no Excel use o botão no topo da folha Movimentos (estes dados não voltam para a app).', s: 'wrap' }];
   M.push(`B${row + 1}:I${row + 1}`);
-  const heights = { 1: 34, 8: 30, 11: 30, 15: 30, 18: 30, [row + 1]: 32 };
-  if (full) heights[22] = 30;
-  // chart data, to the right (K:L)
-  P[2] = P[2] || []; P[2][10] = { v: 'Dados dos gráficos', s: 'b' };
+  heights[row + 1] = 32;
+  // chart data, to the right (K:L): the 10 biggest spending categories in the period, and the split by type
+  P[2] = P[2] || []; P[2][10] = { v: 'Dados dos gráficos (período em análise)', s: 'b' };
   P[3][10] = { v: 'Categoria', s: 'h' }; P[3][11] = { v: 'Total', s: 'h' };
-  const spendCats = Object.entries(totCat).filter(([c]) => SPEND.includes(catType(c))).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  spendCats.forEach(([c, v], i) => { const r = 5 + i; P[r - 1] = P[r - 1] || []; P[r - 1][10] = c; P[r - 1][11] = { f: `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,K${r})`, v: r2(v), s: 'eur' }; });
-  const pieR = 17, pieItems = [['Despesas variáveis', 'Despesa'], ['Contas fixas', 'Conta fixa'], ['Dívidas', 'Dívida'], ['Poupança e investimento', 'Poupança']];
+  const ranked = catNames.map((c, i) => [c, SPEND.includes(catType(c)) && (perCat[c] || 0) > 0 ? r2(perCat[c]) + (i + 2) / 1e6 : 0]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
+  for (let n = 1; n <= 10; n++) {
+    const r = 4 + n, hit = ranked[n - 1];
+    P[r - 1] = P[r - 1] || [];
+    P[r - 1][10] = { f: `IFERROR(IF(LARGE(tCategorias[Ordem],${n})>0,INDEX(tCategorias[Categoria],MATCH(LARGE(tCategorias[Ordem],${n}),tCategorias[Ordem],0)),""),"")`, v: hit ? hit[0] : '' };
+    P[r - 1][11] = { f: `IF(K${r}="","",SUMIFS(${MV('C')},${MV('B')},K${r},${MV('A')},">="&Inicio,${MV('A')},"<="&Fim))`, v: hit ? r2(perCat[hit[0]]) : '', s: 'eur' };
+  }
+  const pieR = 18, pieItems = [['Despesas variáveis', 'Despesa'], ['Contas fixas', 'Conta fixa'], ['Dívidas', 'Dívida'], ['Poupança e investimento', 'Poupança']];
   P[pieR - 2] = P[pieR - 2] || []; P[pieR - 2][10] = { v: 'Para onde foi o dinheiro', s: 'h' }; P[pieR - 2][11] = { v: 'Total', s: 'h' };
-  pieItems.forEach(([l, t], i) => { const r = pieR + i; P[r - 1] = P[r - 1] || []; P[r - 1][10] = l; P[r - 1][11] = { f: sumAll(t), v: r2(all[t] || 0), s: 'eur' }; });
+  pieItems.forEach(([l, t], i) => { const r = pieR + i; P[r - 1] = P[r - 1] || []; P[r - 1][10] = l; P[r - 1][11] = { f: sumPer(t), v: r2(tp[t] || 0), s: 'eur' }; });
   const ch0 = row + 2, CH = 17;
   const charts = [];
   if (nM) {
@@ -1904,18 +1929,26 @@ function workbookData(win) {
     charts.push({ type: 'line', title: 'Taxa de poupança por mês', from: [5, ch0], to: [9, ch0 + CH], cat: catMonths, axFmt: '0%', fmt: '0.0%', markers: true,
       series: [{ name: 'Taxa de poupança', color: '1F5FD1', ...resCol(7, t => t.Receita > 0 ? t.taxa : null) }] });
   }
-  if (spendCats.length) charts.push({ type: 'bar', title: 'Onde vai o dinheiro (10 maiores categorias)', from: [1, ch0 + CH + 1], to: [5, ch0 + 2 * CH + 1],
-    cat: { ref: xlRef('Painel', 10, 5, 10, 4 + spendCats.length), vals: spendCats.map(([c]) => c) },
-    series: [{ name: 'Total', color: '6D5EF6', ref: xlRef('Painel', 11, 5, 11, 4 + spendCats.length), vals: spendCats.map(([, v]) => v) }] });
-  if (all.Receita || all.gastos) charts.push({ type: 'pie', title: 'Para onde foi o dinheiro', from: [5, ch0 + CH + 1], to: [9, ch0 + 2 * CH + 1], colors: ['F59E0B', 'E4572E', '9CA3AF', '2E9D6A'],
-    cat: { ref: xlRef('Painel', 10, pieR, 10, pieR + 3), vals: pieItems.map(([l]) => l) },
-    series: [{ name: 'Total', ref: xlRef('Painel', 11, pieR, 11, pieR + 3), vals: pieItems.map(([, t]) => all[t] || 0) }] });
-  const painel = { name: 'Painel', tab: '1E3A8A', noGrid: true, cols: [2, 15, 15, 15, 15, 15, 15, 15, 15, 3, 26, 14], rows: P, merges: M, heights, charts,
-    valid: [{ type: 'date', op: 'greaterThan', f: '36526', ref: 'D4', title: 'Mês em análise', prompt: 'Escreva o dia 1 do mês, ex.: 01/10/2026.', error: 'Escreva uma data, ex.: 01/10/2026.' }],
-    cf: [{ ref: 'F8:G8 F15:G15 F18:G18 F11:G11', rules: [{ op: 'lessThan', v: '0', dxf: 0 }] }] };
+  if (tx.length) {
+    charts.push({ type: 'bar', title: 'Onde vai o dinheiro (10 maiores categorias)', from: [1, ch0 + CH + 1], to: [5, ch0 + 2 * CH + 1],
+      cat: { ref: xlRef('Painel', 10, 5, 10, 14), vals: Array.from({ length: 10 }, (_, i) => ranked[i] ? ranked[i][0] : '') },
+      series: [{ name: 'Total', color: '6D5EF6', ref: xlRef('Painel', 11, 5, 11, 14), vals: Array.from({ length: 10 }, (_, i) => ranked[i] ? r2(perCat[ranked[i][0]]) : null) }] });
+    charts.push({ type: 'pie', title: 'Para onde foi o dinheiro', from: [5, ch0 + CH + 1], to: [9, ch0 + 2 * CH + 1], colors: ['F59E0B', 'E4572E', '9CA3AF', '2E9D6A'],
+      cat: { ref: xlRef('Painel', 10, pieR, 10, pieR + 3), vals: pieItems.map(([l]) => l) },
+      series: [{ name: 'Total', ref: xlRef('Painel', 11, pieR, 11, pieR + 3), vals: pieItems.map(([, t]) => tp[t] || 0) }] });
+  }
+  const painel = { name: 'Painel', tab: '1E3A8A', noGrid: true, cols: [2, 19, 15, 15, 15, 15, 15, 15, 15, 3, 26, 14], rows: P, merges: M, heights, charts,
+    valid: [
+      { type: 'list', f: `'${RES}'!$A$2:$A$${Math.max(2, lastR)}`, ref: 'D4', title: 'Mês em análise', prompt: 'Escolha o mês na lista.', error: 'Escolha um mês da lista.' },
+      { type: 'date', op: 'greaterThan', f: '36526', ref: 'D5', title: 'Início do período', prompt: 'Primeiro dia do período, ex.: 01/01/2026.', error: 'Escreva uma data, ex.: 01/01/2026.' },
+      { type: 'date', op: 'greaterThan', f: '36526', ref: 'F5', title: 'Fim do período', prompt: 'Último dia do período, ex.: 31/12/2026.', error: 'Escreva uma data, ex.: 31/12/2026.' },
+    ],
+    cf: [{ ref: 'F9:G9 F12:G12 F16:G16 F19:G19', rules: [{ op: 'lessThan', v: '0', dxf: 0 }] }] };
 
   const sheets = [painel, movSheet, resSheet];
-  const names = [{ name: 'ListaCategorias', ref: 'tCategorias[Categoria]' }, { name: 'MesAnalise', ref: `'Painel'!$D$4` }, { name: 'NMeses', ref: `MAX(1,COUNT('${RES}'!$A$2:$A$${Math.max(2, lastR)}))` }];
+  const resB = c => `'${RES}'!$${c}$2:$${c}$${Math.max(2, lastR)}`;
+  const names = [{ name: 'ListaCategorias', ref: 'tCategorias[Categoria]' }, { name: 'MesAnalise', ref: `'Painel'!$D$4` }, { name: 'Inicio', ref: `'Painel'!$D$5` }, { name: 'Fim', ref: `'Painel'!$F$5` },
+    { name: 'NMeses', ref: `MAX(1,SUMPRODUCT(--((${resB('B')}+${resB('F')})>0)))` }, { name: 'NMesesPeriodo', ref: 'MAX(1,(YEAR(Fim)-YEAR(Inicio))*12+MONTH(Fim)-MONTH(Inicio)+1)' }];
 
   // ---- Anual
   const years = [...new Set(months.map(k => k.slice(0, 4)))].sort();
@@ -1988,13 +2021,6 @@ async function exportXlsx(win, label) {
   try { await host.saveFile(`livro-de-contas-${label || today()}.xlsx`, xlsxFile(workbookData(win)), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
   catch (e) { toast('A exportação foi cancelada ou não está disponível.'); }
 }
-// The month on screen in Mês, or the year (or last 12 months) on screen in Ano.
-function exportPeriod() {
-  if (view === 'mes') return exportXlsx([curMonth], curMonth);
-  const win = yearWindow();
-  return exportXlsx(win, yearSel === 'last12' ? `${win[0]}-a-${win[11]}` : yearSel);
-}
-const xlBtn = () => host.saveFile ? '<button class="btn ghost small" data-act="export-per" title="Exportar este período para Excel">⤓ Excel</button>' : '';
 
 // ---------- boot ----------
 
