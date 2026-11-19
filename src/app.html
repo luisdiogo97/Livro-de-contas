@@ -1594,76 +1594,395 @@ function zipStore(files) {
   let p = 0; for (const a of all) { out.set(a, p); p += a.length; }
   return out;
 }
-// Cells: string, number, null, or { v, s } with s = 'h' header, 'eur', 'date', 'month', 'pct', 'b' bold, 'beur' bold euro
-const XS = { h: 1, eur: 2, date: 3, pct: 4, month: 5, b: 6, beur: 7, bpct: 8 };
-function xlsxFile(sheets) {
-  const x = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
-  const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
-  const serial = iso => { const [y, m, d] = iso.split('-').map(Number); return (Date.UTC(y, m - 1, d || 1) - Date.UTC(1899, 11, 30)) / 864e5; };
-  const cell = (c, r, i) => {
-    if (c == null || c === '') return '';
-    const o = typeof c === 'object' ? c : { v: c }, ref = col(i) + r, st = o.s ? ` s="${XS[o.s]}"` : '';
-    if (o.s === 'date' || o.s === 'month') return `<c r="${ref}"${st}><v>${serial(o.v)}</v></c>`;
-    if (typeof o.v === 'number') return isFinite(o.v) ? `<c r="${ref}"${st}><v>${Math.round(o.v * 1e6) / 1e6}</v></c>` : '';
-    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${x(o.v)}</t></is></c>`;
-  };
-  const sheetXml = sh => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sh.rows.map((row, ri) => `<row r="${ri + 1}">${row.map((c, ci) => cell(c, ri + 1, ci)).join('')}</row>`).join('')}</sheetData>${sh.rows.length > 1 ? `<autoFilter ref="A1:${col(sh.rows[0].length - 1)}${sh.filterTo || sh.rows.length}"/>` : ''}</worksheet>`;
-  const files = [
-    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
-    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
-    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh, i) => `<sheet name="${x(sh.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><definedNames>${sheets.map((sh, i) => sh.rows.length > 1 ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${x(sh.name)}'!$A$1:$${col(sh.rows[0].length - 1)}$${sh.filterTo || sh.rows.length}</definedName>` : '').join('')}</definedNames></workbook>`],
-    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
-    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0.00\\ &quot;€&quot;"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/><numFmt numFmtId="166" formatCode="mmm yyyy"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F5FD1"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="10" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
-    ...sheets.map((sh, i) => [`xl/worksheets/sheet${i + 1}.xml`, sheetXml(sh)]),
+// ---------- Excel workbook ----------
+// A small .xlsx writer: styled cells, formulas (with their values cached so any viewer shows numbers),
+// Excel tables, drop-down lists, conditional formats, merged cells and native charts.
+// A cell is a string, a number, null, or { v, f, s }: v = value (ISO date for 'date'/'month'), f = formula, s = style.
+const XL_STYLES = (() => {
+  // numFmts: 164 € with cents, 165 date, 166 month, 167 € whole, 168 percent one decimal
+  const fonts = [
+    '<font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FF111827"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><sz val="22"/><color rgb="FF1E3A8A"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><sz val="10"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><sz val="18"/><color rgb="FF111827"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><sz val="9"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><b/><sz val="13"/><color rgb="FF1E3A8A"/><name val="Calibri"/><family val="2"/></font>',
+    '<font><sz val="11"/><color rgb="FF6B7280"/><name val="Calibri"/><family val="2"/></font>',
   ];
-  return zipStore(files);
+  const fills = ['none', 'gray125', 'FF1F5FD1', 'FFF3F6FB', 'FFE8EEFB', 'FFFFF4CC'].map(c => c === 'none' || c === 'gray125' ? `<fill><patternFill patternType="${c}"/></fill>` : `<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`);
+  const borders = [
+    '<border><left/><right/><top/><bottom/><diagonal/></border>',
+    '<border><left/><right/><top style="thin"><color rgb="FF9CA3AF"/></top><bottom style="thin"><color rgb="FF9CA3AF"/></bottom><diagonal/></border>',
+    '<border><left style="thin"><color rgb="FFD97706"/></left><right style="thin"><color rgb="FFD97706"/></right><top style="thin"><color rgb="FFD97706"/></top><bottom style="thin"><color rgb="FFD97706"/></bottom><diagonal/></border>',
+  ];
+  // name: [numFmt, font, fill, border, align]
+  const defs = {
+    n: [0, 0, 0, 0], h: [0, 1, 2, 0, 'center'], eur: [164, 0, 0, 0], eur0: [167, 0, 0, 0], date: [165, 0, 0, 0], month: [166, 0, 0, 0], pct: [168, 0, 0, 0], int: [1, 0, 0, 0],
+    b: [0, 2, 0, 0], tot: [0, 2, 4, 1], teur: [164, 2, 4, 1], tpct: [168, 2, 4, 1], tint: [1, 2, 4, 1],
+    title: [0, 3, 0, 0], sub: [0, 4, 0, 0], sec: [0, 7, 0, 0], calc: [0, 8, 0, 0], cmonth: [166, 8, 0, 0],
+    kl: [0, 6, 3, 0, 'left'], kv: [167, 5, 3, 0, 'left'], kp: [168, 5, 3, 0, 'left'], kn: [1, 5, 3, 0, 'left'],
+    input: [166, 2, 5, 2, 'center'], wrap: [0, 4, 0, 0, 'wrap'],
+  };
+  const names = Object.keys(defs), idx = {};
+  names.forEach((k, i) => { idx[k] = i; });
+  const xf = ([nf, fo, fi, bo, al]) => `<xf numFmtId="${nf}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${nf ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1"><alignment ${al === 'wrap' ? 'wrapText="1" vertical="top"' : `horizontal="${al}" vertical="center"`}/></xf>` : '/>'}`;
+  const dxfs = ['<dxf><font><color rgb="FFB91C1C"/></font></dxf>', '<dxf><font><color rgb="FF15803D"/></font></dxf>',
+    '<dxf><font><b/><color rgb="FFB91C1C"/></font><fill><patternFill><bgColor rgb="FFFEE2E2"/></patternFill></fill></dxf>',
+    '<dxf><font><color rgb="FF92400E"/></font><fill><patternFill><bgColor rgb="FFFEF3C7"/></patternFill></fill></dxf>'];
+  const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="5"><numFmt numFmtId="164" formatCode="#,##0.00\\ &quot;€&quot;"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/><numFmt numFmtId="166" formatCode="mmm yyyy"/><numFmt numFmtId="167" formatCode="#,##0\\ &quot;€&quot;"/><numFmt numFmtId="168" formatCode="0.0%"/></numFmts><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="${fills.length}">${fills.join('')}</fills><borders count="${borders.length}">${borders.join('')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${names.length}">${names.map(k => xf(defs[k])).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${dxfs.length}">${dxfs.join('')}</dxfs><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return { idx, xml };
+})();
+const xlEsc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+const xlCol = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
+const xlSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return (Date.UTC(y, m - 1, d || 1) - Date.UTC(1899, 11, 30)) / 864e5; };
+// 'Sheet'!$A$2:$A$9 (c = 0-based column, r = 1-based row)
+const xlRef = (sh, c0, r0, c1, r1) => `'${sh.replace(/'/g, "''")}'!$${xlCol(c0)}$${r0}` + (c1 == null ? '' : `:$${xlCol(c1)}$${r1}`);
+
+function xlChart(ch) {
+  const C = 'http://schemas.openxmlformats.org/drawingml/2006/chart', A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const fill = c => `<c:spPr><a:solidFill><a:srgbClr val="${c}"/></a:solidFill></c:spPr>`;
+  const numCache = (vals, fmt) => `<c:numCache><c:formatCode>${xlEsc(fmt || 'General')}</c:formatCode><c:ptCount val="${vals.length}"/>${vals.map((v, i) => typeof v === 'number' && isFinite(v) ? `<c:pt idx="${i}"><c:v>${Math.round(v * 1e4) / 1e4}</c:v></c:pt>` : '').join('')}</c:numCache>`;
+  const cat = ch.cat.num ? `<c:cat><c:numRef><c:f>${xlEsc(ch.cat.ref)}</c:f>${numCache(ch.cat.vals, ch.cat.fmt)}</c:numRef></c:cat>`
+    : `<c:cat><c:strRef><c:f>${xlEsc(ch.cat.ref)}</c:f><c:strCache><c:ptCount val="${ch.cat.vals.length}"/>${ch.cat.vals.map((v, i) => `<c:pt idx="${i}"><c:v>${xlEsc(v)}</c:v></c:pt>`).join('')}</c:strCache></c:strRef></c:cat>`;
+  const val = s => `<c:val><c:numRef><c:f>${xlEsc(s.ref)}</c:f>${numCache(s.vals, ch.fmt)}</c:numRef></c:val>`;
+  const tx = s => `<c:tx><c:v>${xlEsc(s.name)}</c:v></c:tx>`;
+  const txt = (sz, color, b) => `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz}"${b ? ' b="1"' : ''}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:defRPr></a:pPr><a:endParaRPr lang="pt-PT"/></a:p></c:txPr>`;
+  const title = `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="pt-PT" sz="1200" b="1"><a:solidFill><a:srgbClr val="1F2937"/></a:solidFill></a:rPr><a:t>${xlEsc(ch.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
+  const axes = (catFmt, rev) => `<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="${rev ? 'maxMin' : 'minMax'}"/></c:scaling><c:delete val="0"/><c:axPos val="${ch.type === 'bar' ? 'l' : 'b'}"/>${catFmt ? `<c:numFmt formatCode="${xlEsc(catFmt)}" sourceLinked="0"/>` : ''}<c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/><c:spPr><a:ln><a:solidFill><a:srgbClr val="D1D5DB"/></a:solidFill></a:ln></c:spPr>${txt(900, '4B5563')}<c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
+    + `<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${ch.type === 'bar' ? 'b' : 'l'}"/><c:majorGridlines><c:spPr><a:ln><a:solidFill><a:srgbClr val="EEF0F3"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="${xlEsc(ch.axFmt || '#,##0 "€"')}" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${txt(900, '6B7280')}<c:crossAx val="1"/><c:crosses val="${rev ? 'max' : 'autoZero'}"/><c:crossBetween val="between"/></c:valAx>`;
+  let plot;
+  if (ch.type === 'pie') {
+    const s = ch.series[0];
+    plot = `<c:doughnutChart><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/>${tx(s)}${ch.colors.map((c, i) => `<c:dPt><c:idx val="${i}"/><c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="${c}"/></a:solidFill><a:ln><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr></c:dPt>`).join('')}<c:dLbls><c:numFmt formatCode="0%" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txt(900, 'FFFFFF', true)}<c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="1"/><c:showBubbleSize val="0"/><c:showLeaderLines val="0"/></c:dLbls>${cat}${val(s)}</c:ser><c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>`;
+  } else if (ch.type === 'line') {
+    plot = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${ch.series.map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${tx(s)}<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:srgbClr val="${s.color}"/></a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="${ch.markers ? 'circle' : 'none'}"/>${ch.markers ? `<c:size val="5"/>${fill(s.color)}` : ''}</c:marker>${cat}${val(s)}<c:smooth val="0"/></c:ser>`).join('')}<c:marker val="1"/><c:axId val="1"/><c:axId val="2"/></c:lineChart>${axes(ch.cat.fmt)}`;
+  } else {
+    const horiz = ch.type === 'bar';
+    plot = `<c:barChart><c:barDir val="${horiz ? 'bar' : 'col'}"/><c:grouping val="clustered"/><c:varyColors val="0"/>${ch.series.map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${tx(s)}${fill(s.color)}<c:invertIfNegative val="0"/>${cat}${val(s)}</c:ser>`).join('')}<c:gapWidth val="${horiz ? 50 : 70}"/><c:axId val="1"/><c:axId val="2"/></c:barChart>${axes(ch.cat.fmt, horiz)}`;
+  }
+  const legend = ch.series.length > 1 || ch.type === 'pie' ? `<c:legend><c:legendPos val="${ch.type === 'pie' ? 'r' : 'b'}"/><c:overlay val="0"/>${txt(900, '374151')}</c:legend>` : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="${C}" xmlns:a="${A}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart>${title}<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>${plot}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="E5E7EB"/></a:solidFill></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:latin typeface="Calibri"/></a:defRPr></a:pPr><a:endParaRPr lang="pt-PT"/></a:p></c:txPr></c:chartSpace>`;
 }
+
+function xlsxFile(book) {
+  const sheets = book.sheets, XI = XL_STYLES.idx;
+  const files = [], ct = [], wbRels = [];
+  let chartN = 0, tableN = 0, drawN = 0;
+  const cellXml = (c, r, i) => {
+    if (c == null || c === '') return '';
+    const o = typeof c === 'object' ? c : { v: c }, ref = xlCol(i) + r, st = o.s ? ` s="${XI[o.s]}"` : '';
+    const f = o.f ? `<f>${xlEsc(o.f)}</f>` : '';
+    let v = o.v;
+    if ((o.s === 'date' || o.s === 'month' || o.s === 'input' || o.s === 'cmonth') && typeof v === 'string' && /^\d{4}-\d\d/.test(v)) v = xlSerial(v);
+    if (typeof v === 'number') return isFinite(v) ? `<c r="${ref}"${st}>${f}<v>${Math.round(v * 1e6) / 1e6}</v></c>` : (f ? `<c r="${ref}"${st} t="str">${f}<v></v></c>` : `<c r="${ref}"${st}/>`);
+    if (v == null || v === '') return f ? `<c r="${ref}"${st} t="str">${f}<v></v></c>` : (o.s ? `<c r="${ref}"${st}/>` : '');
+    if (f) return `<c r="${ref}"${st} t="str">${f}<v>${xlEsc(v)}</v></c>`;
+    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xlEsc(v)}</t></is></c>`;
+  };
+  sheets.forEach((sh, si) => {
+    const n = si + 1, rels = [];
+    let tableParts = '', drawing = '';
+    if (sh.table) {
+      tableN++; rels.push(`<Relationship Id="rId${rels.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table${tableN}.xml"/>`);
+      const t = sh.table, last = Math.max(2, t.rows + 1), ref = `A1:${xlCol(t.cols.length - 1)}${last}`;
+      files.push([`xl/tables/table${tableN}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${tableN}" name="${t.name}" displayName="${t.name}" ref="${ref}" totalsRowShown="0"><autoFilter ref="${ref}"/><tableColumns count="${t.cols.length}">${t.cols.map((c, i) => `<tableColumn id="${i + 1}" name="${xlEsc(c.name)}"${c.calc ? `><calculatedColumnFormula>${xlEsc(c.calc)}</calculatedColumnFormula></tableColumn>` : '/>'}`).join('')}</tableColumns><tableStyleInfo name="${t.style || 'TableStyleMedium2'}" showFirstColumn="0" showLastColumn="0" showRowStripes="1" showColumnStripes="0"/></table>`]);
+      ct.push(`<Override PartName="/xl/tables/table${tableN}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`);
+      tableParts = `<tableParts count="1"><tablePart r:id="rId${rels.length}"/></tableParts>`;
+      if (!t.rows) sh.rows[1] = sh.rows[1] || [];
+    }
+    if (sh.charts && sh.charts.length) {
+      drawN++; rels.push(`<Relationship Id="rId${rels.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${drawN}.xml"/>`);
+      drawing = `<drawing r:id="rId${rels.length}"/>`;
+      const dRels = [], anchors = [];
+      sh.charts.forEach((ch, k) => {
+        chartN++;
+        files.push([`xl/charts/chart${chartN}.xml`, xlChart(ch)]);
+        ct.push(`<Override PartName="/xl/charts/chart${chartN}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`);
+        dRels.push(`<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${chartN}.xml"/>`);
+        const [c0, r0] = ch.from, [c1, r1] = ch.to;
+        anchors.push(`<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${c0}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${r0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${c1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${r1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${k + 2}" name="Gráfico ${k + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId${k + 1}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`);
+      });
+      files.push([`xl/drawings/drawing${drawN}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors.join('')}</xdr:wsDr>`]);
+      files.push([`xl/drawings/_rels/drawing${drawN}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${dRels.join('')}</Relationships>`]);
+      ct.push(`<Override PartName="/xl/drawings/drawing${drawN}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+    }
+    const fr = sh.freeze || (sh.table ? { r: 1, c: 0 } : null);
+    const pane = fr && (fr.r || fr.c) ? `<pane${fr.c ? ` xSplit="${fr.c}"` : ''}${fr.r ? ` ySplit="${fr.r}"` : ''} topLeftCell="${xlCol(fr.c || 0)}${(fr.r || 0) + 1}" activePane="${fr.r && fr.c ? 'bottomRight' : fr.r ? 'bottomLeft' : 'topRight'}" state="frozen"/>` : '';
+    const rowsXml = sh.rows.map((row, ri) => {
+      const ht = sh.heights && sh.heights[ri + 1];
+      const cells = (row || []).map((c, ci) => cellXml(c, ri + 1, ci)).join('');
+      return cells || ht ? `<row r="${ri + 1}"${ht ? ` ht="${ht}" customHeight="1"` : ''}>${cells}</row>` : '';
+    }).join('');
+    const merges = sh.merges && sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : '';
+    let prio = 0;
+    const cf = (sh.cf || []).map(r => `<conditionalFormatting sqref="${r.ref}">${r.rules.map(x => x.bar ? `<cfRule type="dataBar" priority="${++prio}"><dataBar><cfvo type="num" val="0"/><cfvo type="max"/><color rgb="FF${x.bar}"/></dataBar></cfRule>`
+      : `<cfRule type="cellIs" dxfId="${x.dxf}" priority="${++prio}" operator="${x.op}"><formula>${xlEsc(x.v)}</formula>${x.v2 != null ? `<formula>${xlEsc(x.v2)}</formula>` : ''}</cfRule>`).join('')}</conditionalFormatting>`).join('');
+    const dv = sh.valid && sh.valid.length ? `<dataValidations count="${sh.valid.length}">${sh.valid.map(d => `<dataValidation type="${d.type}"${d.op ? ` operator="${d.op}"` : ''} allowBlank="1" showInputMessage="1" showErrorMessage="1" errorTitle="${xlEsc(d.title)}" error="${xlEsc(d.error)}" promptTitle="${xlEsc(d.title)}" prompt="${xlEsc(d.prompt || '')}" sqref="${d.ref}"><formula1>${xlEsc(d.f)}</formula1></dataValidation>`).join('')}</dataValidations>` : '';
+    files.push([`xl/worksheets/sheet${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr>${sh.tab ? `<tabColor rgb="FF${sh.tab}"/>` : ''}<pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView ${sh.noGrid ? 'showGridLines="0" ' : ''}${si === 0 ? 'tabSelected="1" ' : ''}workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsXml}</sheetData>${merges}${cf}${dv}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>${drawing}${tableParts}</worksheet>`]);
+    ct.push(`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+    if (rels.length) files.push([`xl/worksheets/_rels/sheet${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`]);
+    wbRels.push(`<Relationship Id="rId${n}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${n}.xml"/>`);
+  });
+  wbRels.push(`<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`);
+  const names = (book.names || []).map(d => `<definedName name="${d.name}">${xlEsc(d.ref)}</definedName>`).join('');
+  return zipStore([
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>${ct.join('')}</Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`],
+    ['docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xlEsc(book.title || 'Livro de Contas')}</dc:title><dc:creator>Livro de Contas</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString().slice(0, 19)}Z</dcterms:created></cp:coreProperties>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${sheets.map((sh, i) => `<sheet name="${xlEsc(sh.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${names ? `<definedNames>${names}</definedNames>` : ''}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${wbRels.join('')}</Relationships>`],
+    ['xl/styles.xml', XL_STYLES.xml],
+    ...files,
+  ]);
+}
+
+// The workbook: a dashboard, the entries as an Excel table you can keep adding to (category from a list,
+// type/month/nature filled in by formulas), monthly and yearly summaries and budgets that recalculate,
+// accounts and investments with their history, and charts.
 // win = list of month keys to export only that period (a month or a year); none = everything.
 function workbookData(win) {
-  const H = a => a.map(v => ({ v, s: 'h' })), E = v => ({ v: Math.round(v * 100) / 100, s: 'eur' }), P = v => ({ v, s: 'pct' });
+  const r2 = v => Math.round(v * 100) / 100;
   const inWin = k => !win || win.includes(k);
   const tx = allTx().filter(x => inWin(x.d.slice(0, 7))).slice().sort((a, b) => a.d.localeCompare(b.d) || a.id.localeCompare(b.id));
-  const natOf = c => (S.cats.find(k => k.name === c) || {}).nature || '';
-  const mov = [H(['Data', 'Mês', 'Tipo', 'Categoria', 'Valor', 'Nota', 'Natureza'])].concat(tx.map(x => [{ v: x.d, s: 'date' }, { v: x.d.slice(0, 7), s: 'month' }, catType(x.c), x.c, E(x.v), x.n || '', natOf(x.c)]));
-  const keys = Object.keys(S.months).filter(k => S.months[k].length && inWin(k)).sort();
-  const per = keys.map(k => [k, totalsOf(S.months[k])]);
-  const sum = f => per.reduce((a, [, t]) => a + f(t), 0), n = per.length || 1;
-  const mrow = (t, lbl, st) => [lbl, (st === 'b' ? { v: t.Receita, s: 'beur' } : E(t.Receita)), E(t.Despesa), E(t['Conta fixa']), E(t.Dívida), (st === 'b' ? { v: t.gastos, s: 'beur' } : E(t.gastos)), E(t.poupado), { v: t.taxa, s: st === 'b' ? 'bpct' : 'pct' }, E(t.Poupança)];
-  const totT = totalsOf(tx), avgT = {}; for (const k of Object.keys(totT)) avgT[k] = totT[k] / n; avgT.taxa = totT.taxa;
-  const mensal = [H(['Mês', 'Receitas', 'Despesas variáveis', 'Contas fixas', 'Dívidas', 'Total gastos', 'Sobrou', 'Taxa de poupança', 'Poupança e investimento'])]
-    .concat(per.map(([k, t]) => mrow(t, { v: k, s: 'month' })))
-    .concat(per.length ? [[], mrow(totT, { v: 'Total', s: 'b' }, 'b'), mrow(avgT, { v: 'Média mensal', s: 'b' }, 'b')] : []);
-  const byCat = {}; for (const x of tx) byCat[x.c] = (byCat[x.c] || 0) + x.v;
-  const catNames = [...new Set([...S.cats.map(c => c.name), ...Object.keys(byCat)])];
-  const cats = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'Total', 'Média mensal', 'Movimentos'])]
-    .concat(catNames.filter(c => !win || byCat[c]).map(c => { const k = S.cats.find(z => z.name === c) || {}; return [c, catType(c), k.nature || '', E(+k.budget || 0), E(byCat[c] || 0), E((byCat[c] || 0) / n), tx.filter(x => x.c === c).length]; }));
-  const base = [
-    { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
-    { name: 'Resumo mensal', cols: [12, 13, 18, 14, 12, 14, 13, 16, 22], rows: mensal, filterTo: per.length + 1 },
-    { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
-  ];
-  if (win) return base;
-  const accs = S.accounts.accounts || [];
-  const contas = [H(['Banco', 'Produto', 'Saldo', 'TANB', 'Juros pagos', 'Retenção IRS', 'Taxa líquida efetiva', 'Juros líquidos por ano', 'Juros líquidos por mês'])]
-    .concat(accs.map(a => { const c = accCalc(a); return [a.bank, a.product, E(+a.balance || 0), P(+a.tanb || 0), a.cap, a.irs ? 'Sim' : 'Não', P(c.eff), E(c.year), E(c.month)]; }))
-    .concat(accs.length ? [[], [{ v: 'Total', s: 'b' }, '', { v: accs.reduce((s, a) => s + (+a.balance || 0), 0), s: 'beur' }, '', '', '', '', { v: accs.reduce((s, a) => s + accCalc(a).year, 0), s: 'beur' }, { v: accs.reduce((s, a) => s + accCalc(a).month, 0), s: 'beur' }]] : []);
-  const histo = [H(['Data', 'Total em contas'])].concat((S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d)).map(h => [{ v: h.d, s: 'date' }, E(h.total)]));
-  const EC = etfCalc();
-  const etfs = [H(['Investimento', 'Tipo', 'Descrição', 'Custo anual', 'Dividendos', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo', 'Unidades', 'Preço médio'])]
-    .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.div || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '', r.units > 0 ? +r.units : '', r.avg > 0 ? E(+r.avg) : '']));
-  const snaps = [H(['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'])].concat((S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.e.localeCompare(b.e)).map(x => [{ v: x.d, s: 'date' }, x.e, E(+x.inv || 0), E(+x.val || 0)]));
-  return [...base,
-    { name: 'Contas', cols: [18, 20, 13, 9, 12, 13, 18, 20, 20], rows: contas, filterTo: accs.length + 1 },
-    { name: 'Contas histórico', cols: [12, 16], rows: histo },
-    { name: 'Investimentos', cols: [14, 10, 40, 12, 11, 10, 13, 13, 12, 10, 11, 14, 11, 12], rows: etfs },
-    { name: 'Investimentos registos', cols: [12, 14, 20, 16], rows: snaps },
-  ];
+  const H = a => a.map(v => ({ v, s: 'h' }));
+  const catOf = c => S.cats.find(k => k.name === c) || {};
+  const full = !win;
+  // months shown in the summary: every month from the first entry to the last (or today), with no gaps
+  const dataKeys = [...new Set(tx.map(x => x.d.slice(0, 7)))].sort();
+  let months = [];
+  if (win) months = win.slice().sort();
+  else if (dataKeys.length) { const end = [dataKeys[dataKeys.length - 1], monthKey(today())].sort()[1]; for (let k = dataKeys[0]; k <= end; k = addMonths(k, 1)) months.push(k); }
+  const curM = monthKey(today()), anaM = months.includes(curM) ? curM : (dataKeys[dataKeys.length - 1] || months[months.length - 1] || curM);
+  const byM = {}; for (const x of tx) (byM[x.d.slice(0, 7)] = byM[x.d.slice(0, 7)] || []).push(x);
+  const tm = k => totalsOf(byM[k] || []);
+  const nMonths = Math.max(1, months.length);
+
+  // ---- Movimentos (table tMov): A Data, B Categoria, C Valor, D Nota, E Meio, F Tipo, G Mês, H Natureza
+  const MOV = 'Movimentos', NR = Math.max(5000, tx.length + 2000);
+  const TR = c => `tMovimentos[[#This Row],[${c}]]`;
+  const F_TIPO = `IFERROR(INDEX('Categorias'!$B:$B,MATCH(${TR('Categoria')},'Categorias'!$A:$A,0)),"")`;
+  const F_MES = `IF(${TR('Data')}="","",DATE(YEAR(${TR('Data')}),MONTH(${TR('Data')}),1))`;
+  const F_NAT = `IFERROR(INDEX('Categorias'!$C:$C,MATCH(${TR('Categoria')},'Categorias'!$A:$A,0))&"","")`;
+  const movRows = [H(['Data', 'Categoria', 'Valor', 'Nota', 'Meio', 'Tipo', 'Mês', 'Natureza'])].concat(tx.map((x, i) => {
+    void i;
+    return [{ v: x.d, s: 'date' }, x.c, { v: r2(x.v), s: 'eur' }, x.n || '', x.m || '', { f: F_TIPO, v: catType(x.c), s: 'calc' }, { f: F_MES, v: x.d.slice(0, 7), s: 'cmonth' }, { f: F_NAT, v: catOf(x.c).nature || '', s: 'calc' }];
+  }));
+  const movSheet = {
+    name: MOV, tab: '2E9D6A', cols: [12, 24, 12, 36, 16, 13, 11, 14], rows: movRows,
+    table: { name: 'tMovimentos', rows: tx.length, cols: [{ name: 'Data' }, { name: 'Categoria' }, { name: 'Valor' }, { name: 'Nota' }, { name: 'Meio' },
+      { name: 'Tipo', calc: F_TIPO }, { name: 'Mês', calc: F_MES }, { name: 'Natureza', calc: F_NAT }] },
+    valid: [
+      { type: 'date', op: 'greaterThan', f: '36526', ref: `A2:A${NR}`, title: 'Data', prompt: 'Data do movimento, ex.: 19/11/2026', error: 'Escreva uma data válida, ex.: 19/11/2026.' },
+      { type: 'list', f: 'ListaCategorias', ref: `B2:B${NR}`, title: 'Categoria', prompt: 'Escolha da lista. Para uma nova, acrescente-a na folha Categorias.', error: 'Escolha uma categoria da lista (folha Categorias).' },
+      { type: 'decimal', op: 'greaterThan', f: '0', ref: `C2:C${NR}`, title: 'Valor', prompt: 'Valor em euros, sempre positivo. O tipo da categoria diz se entra ou sai.', error: 'O valor tem de ser um número maior que zero.' },
+    ],
+  };
+
+  // ---- Categorias (table tCat): A Categoria, B Tipo, C Natureza, D Orçamento, E No mês em análise, F % do orçamento, G Total, H Média mensal, I Movimentos
+  const spentIn = (c, k) => (byM[k] || []).filter(x => x.c === c).reduce((a, x) => a + x.v, 0);
+  const totCat = {}, cntCat = {}; for (const x of tx) { totCat[x.c] = (totCat[x.c] || 0) + x.v; cntCat[x.c] = (cntCat[x.c] || 0) + 1; }
+  const TYPES = ['Receita', 'Despesa', 'Conta fixa', 'Poupança', 'Dívida'];
+  const catNames = [...new Set([...S.cats.slice().sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type)).map(c => c.name), ...Object.keys(totCat)])];
+  const CT = c => `tCategorias[[#This Row],[${c}]]`;
+  const CF = [`SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')},'${MOV}'!$G:$G,MesAnalise)`, `IF(${CT('Orçamento mensal')}>0,${CT('No mês em análise')}/${CT('Orçamento mensal')},"")`,
+    `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,${CT('Categoria')})`, `${CT('Total')}/NMeses`, `COUNTIF('${MOV}'!$B:$B,${CT('Categoria')})`];
+  const catRows = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'No mês em análise', '% do orçamento', 'Total', 'Média mensal', 'Movimentos'])].concat(catNames.map((c, i) => {
+    void i; const k = catOf(c), b = +k.budget || 0, m = spentIn(c, anaM), t = totCat[c] || 0;
+    return [c, catType(c), k.nature || '', { v: b, s: 'eur' }, { f: CF[0], v: r2(m), s: 'eur' }, { f: CF[1], v: b > 0 ? m / b : '', s: 'pct' },
+      { f: CF[2], v: r2(t), s: 'eur' }, { f: CF[3], v: r2(t / nMonths), s: 'eur' }, { f: CF[4], v: cntCat[c] || 0, s: 'int' }];
+  }));
+  const nC = catNames.length;
+  const catSheet = {
+    name: 'Categorias', tab: '8B5CF6', cols: [24, 13, 14, 17, 18, 15, 14, 14, 12], rows: catRows,
+    table: { name: 'tCategorias', rows: nC, style: 'TableStyleMedium7', cols: [{ name: 'Categoria' }, { name: 'Tipo' }, { name: 'Natureza' }, { name: 'Orçamento mensal' },
+      { name: 'No mês em análise', calc: CF[0] }, { name: '% do orçamento', calc: CF[1] }, { name: 'Total', calc: CF[2] }, { name: 'Média mensal', calc: CF[3] }, { name: 'Movimentos', calc: CF[4] }] },
+    valid: [
+      { type: 'list', f: '"' + TYPES.join(',') + '"', ref: 'B2:B500', title: 'Tipo', prompt: 'Receita entra; os outros tipos saem.', error: 'Escolha um tipo da lista.' },
+      { type: 'list', f: '"Necessidade,Desejo"', ref: 'C2:C500', title: 'Natureza', prompt: 'Para a regra 50/30/20 (só gastos).', error: 'Escolha Necessidade ou Desejo.' },
+      { type: 'decimal', op: 'greaterThanOrEqual', f: '0', ref: 'D2:D500', title: 'Orçamento', prompt: 'Quanto conta gastar por mês (0 = sem orçamento).', error: 'Use um número igual ou maior que zero.' },
+    ],
+    cf: [{ ref: 'F2:F500', rules: [{ op: 'greaterThan', v: '1', dxf: 2 }, { op: 'between', v: '0.8', v2: '1', dxf: 3 }] }],
+  };
+
+  // ---- Resumo mensal: A Mês, B Receitas, C Despesas variáveis, D Contas fixas, E Dívidas, F Total gastos, G Sobrou, H Taxa, I Poupança e investimento
+  const RES = 'Resumo mensal', sumT = (r, t) => `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$G:$G,$A${r},'${MOV}'!$F:$F,"${t}")`;
+  const resRows = [H(['Mês', 'Receitas', 'Despesas variáveis', 'Contas fixas', 'Dívidas', 'Total gastos', 'Sobrou', 'Taxa de poupança', 'Poupança e investimento'])].concat(months.map((k, i) => {
+    const r = i + 2, t = tm(k);
+    return [{ v: k, s: 'month' }, { f: sumT(r, 'Receita'), v: r2(t.Receita), s: 'eur' }, { f: sumT(r, 'Despesa'), v: r2(t.Despesa), s: 'eur' }, { f: sumT(r, 'Conta fixa'), v: r2(t['Conta fixa']), s: 'eur' },
+      { f: sumT(r, 'Dívida'), v: r2(t.Dívida), s: 'eur' }, { f: `C${r}+D${r}+E${r}`, v: r2(t.gastos), s: 'eur' }, { f: `B${r}-F${r}`, v: r2(t.poupado), s: 'eur' },
+      { f: `IF(B${r}>0,G${r}/B${r},"")`, v: t.Receita > 0 ? t.taxa : '', s: 'pct' }, { f: sumT(r, 'Poupança'), v: r2(t.Poupança), s: 'eur' }];
+  }));
+  const nM = months.length, lastR = nM + 1, all = totalsOf(tx);
+  if (nM) {
+    const colSum = (c, st, fn) => ({ f: `${fn}(${xlCol(c)}2:${xlCol(c)}${lastR})`, s: st });
+    const tot = { Receita: all.Receita, Despesa: all.Despesa, 'Conta fixa': all['Conta fixa'], Dívida: all.Dívida, gastos: all.gastos, poupado: all.poupado, Poupança: all.Poupança };
+    const keysT = ['Receita', 'Despesa', 'Conta fixa', 'Dívida', 'gastos', 'poupado'];
+    resRows.push([]);
+    resRows.push([{ v: 'Total', s: 'tot' }, ...keysT.map((k, j) => ({ ...colSum(j + 1, 'teur', 'SUM'), v: r2(tot[k]) })), { f: `IF(B${lastR + 2}>0,G${lastR + 2}/B${lastR + 2},"")`, v: all.Receita > 0 ? all.taxa : '', s: 'tpct' }, { ...colSum(8, 'teur', 'SUM'), v: r2(tot.Poupança) }]);
+    resRows.push([{ v: 'Média mensal', s: 'tot' }, ...keysT.map((k, j) => ({ ...colSum(j + 1, 'teur', 'AVERAGE'), v: r2(tot[k] / nM) })), { f: `IF(B${lastR + 3}>0,G${lastR + 3}/B${lastR + 3},"")`, v: all.Receita > 0 ? all.taxa : '', s: 'tpct' }, { ...colSum(8, 'teur', 'AVERAGE'), v: r2(tot.Poupança / nM) }]);
+  }
+  const resSheet = {
+    name: RES, tab: '1F5FD1', cols: [12, 14, 18, 14, 12, 14, 14, 16, 22], rows: resRows, freeze: { r: 1, c: 1 },
+    cf: nM ? [{ ref: `G2:G${lastR + 3}`, rules: [{ op: 'lessThan', v: '0', dxf: 0 }] }, { ref: `H2:H${lastR}`, rules: [{ bar: '60A5FA' }] }] : [],
+  };
+  // last 12 months of the summary, for the charts
+  const c0 = Math.max(2, lastR - 11), cN = lastR - c0 + 1, cMonths = months.slice(-cN);
+  const resCol = (c, f) => ({ ref: xlRef(RES, c, c0, c, lastR), vals: cMonths.map(k => f(tm(k))) });
+  const catMonths = { ref: xlRef(RES, 0, c0, 0, lastR), vals: cMonths.map(xlSerial), num: true, fmt: 'mmm yy' };
+
+  // ---- Painel
+  const P = [], M = [], kpiRow = (r, items) => {
+    P[r - 1] = []; P[r] = [];
+    items.forEach(([label, f, v, s], j) => {
+      const c = 1 + j * 2;
+      P[r - 1][c] = { v: label, s: 'kl' }; P[r - 1][c + 1] = { s: 'kl' };
+      P[r][c] = { f, v, s: s || 'kv' }; P[r][c + 1] = { s: s || 'kv' };
+      M.push(`${xlCol(c)}${r}:${xlCol(c + 1)}${r}`, `${xlCol(c)}${r + 1}:${xlCol(c + 1)}${r + 1}`);
+    });
+  };
+  const name = (S.settings.name || '').trim();
+  P[0] = [null, { v: 'Livro de Contas' + (name ? ' · ' + name : ''), s: 'title' }];
+  const span = months.length ? `${monthLong(months[0])} a ${monthLong(months[months.length - 1])}` : 'sem movimentos';
+  P[1] = [null, { v: `Exportado a ${dayShort(today())} ${today().slice(0, 4)} · ${span} · ${tx.length} movimentos`, s: 'sub' }];
+  P[3] = [null, { v: 'Mês em análise', s: 'b' }, null, { v: anaM, s: 'input' }, { s: 'input' }, { v: 'Mude este mês (ex.: 01/10/2026) e os números do mês e os orçamentos atualizam-se.', s: 'sub' }];
+  M.push('D4:E4');
+  const sumMes = t => `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$G:$G,MesAnalise,'${MOV}'!$F:$F,"${t}")`;
+  const sumAll = t => `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$F:$F,"${t}")`;
+  const ta = tm(anaM);
+  P[5] = [null, { v: 'Mês em análise', s: 'sec' }];
+  kpiRow(7, [['Receitas', sumMes('Receita'), r2(ta.Receita)], ['Gastos', `${sumMes('Despesa')}+${sumMes('Conta fixa')}+${sumMes('Dívida')}`, r2(ta.gastos)],
+    ['Sobrou', 'B8-D8', r2(ta.poupado)], ['Taxa de poupança', 'IF(B8>0,F8/B8,"")', ta.Receita > 0 ? ta.taxa : '', 'kp']]);
+  const budAll = budgetOf('Despesa') + budgetOf('Conta fixa');
+  kpiRow(10, [['Orçamento do mês (despesas + contas fixas)', `SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Despesa")+SUMIFS('Categorias'!$D:$D,'Categorias'!$B:$B,"Conta fixa")`, r2(budAll)],
+    ['Gasto face ao orçamento', `${sumMes('Despesa')}+${sumMes('Conta fixa')}`, r2(ta.Despesa + ta['Conta fixa'])],
+    ['Margem', 'B11-D11', r2(budAll - ta.Despesa - ta['Conta fixa'])], ['Posto de lado', sumMes('Poupança'), r2(ta.Poupança)]]);
+  P[12] = [null, { v: 'Todo o período do ficheiro', s: 'sec' }];
+  kpiRow(14, [['Receitas', sumAll('Receita'), r2(all.Receita)], ['Gastos', `${sumAll('Despesa')}+${sumAll('Conta fixa')}+${sumAll('Dívida')}`, r2(all.gastos)],
+    ['Sobrou', 'B15-D15', r2(all.poupado)], ['Taxa de poupança', 'IF(B15>0,F15/B15,"")', all.Receita > 0 ? all.taxa : '', 'kp']]);
+  kpiRow(17, [['Receita média por mês', 'B15/NMeses', r2(all.Receita / nMonths)], ['Gasto médio por mês', 'D15/NMeses', r2(all.gastos / nMonths)],
+    ['Sobra média por mês', 'F15/NMeses', r2(all.poupado / nMonths)], ['Meses', 'NMeses', nMonths, 'kn']]);
+  let row = 19;
+  const accs = S.accounts.accounts || [], EC = etfCalc();
+  if (full) {
+    P[row] = [null, { v: 'Património', s: 'sec' }];
+    const inAcc = accs.reduce((s, a) => s + (+a.balance || 0), 0);
+    kpiRow(row + 2, [['Em contas', 'SUM(tContas[Saldo])', r2(inAcc)], ['Investido', 'SUM(tInvest[Investido])', r2(EC.inv || EC.rows.reduce((s, r) => s + r.inv, 0))],
+      ['Valor dos investimentos', 'SUM(tInvest[Valor atual])', r2(EC.rows.reduce((s, r) => s + r.val, 0))], ['Património total', `B${row + 3}+F${row + 3}`, r2(inAcc + EC.rows.reduce((s, r) => s + r.val, 0))]]);
+    row += 4;
+  }
+  P[row] = [null, { v: 'Para registar no Excel: na folha Movimentos, escreva na primeira linha vazia logo a seguir à tabela (data, categoria da lista, valor). O tipo, o mês e a natureza preenchem-se sozinhos e este painel atualiza. Estes dados não voltam para a app.', s: 'wrap' }];
+  M.push(`B${row + 1}:I${row + 1}`);
+  const heights = { 1: 34, 8: 30, 11: 30, 15: 30, 18: 30, [row + 1]: 32 };
+  if (full) heights[22] = 30;
+  // chart data, to the right (K:L)
+  P[2] = P[2] || []; P[2][10] = { v: 'Dados dos gráficos', s: 'b' };
+  P[3][10] = { v: 'Categoria', s: 'h' }; P[3][11] = { v: 'Total', s: 'h' };
+  const spendCats = Object.entries(totCat).filter(([c]) => SPEND.includes(catType(c))).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  spendCats.forEach(([c, v], i) => { const r = 5 + i; P[r - 1] = P[r - 1] || []; P[r - 1][10] = c; P[r - 1][11] = { f: `SUMIFS('${MOV}'!$C:$C,'${MOV}'!$B:$B,K${r})`, v: r2(v), s: 'eur' }; });
+  const pieR = 17, pieItems = [['Despesas variáveis', 'Despesa'], ['Contas fixas', 'Conta fixa'], ['Dívidas', 'Dívida'], ['Poupança e investimento', 'Poupança']];
+  P[pieR - 2] = P[pieR - 2] || []; P[pieR - 2][10] = { v: 'Para onde foi o dinheiro', s: 'h' }; P[pieR - 2][11] = { v: 'Total', s: 'h' };
+  pieItems.forEach(([l, t], i) => { const r = pieR + i; P[r - 1] = P[r - 1] || []; P[r - 1][10] = l; P[r - 1][11] = { f: sumAll(t), v: r2(all[t] || 0), s: 'eur' }; });
+  const ch0 = row + 2, CH = 17;
+  const charts = [];
+  if (nM) {
+    charts.push({ type: 'col', title: 'Receitas e gastos por mês', from: [1, ch0], to: [5, ch0 + CH], cat: catMonths,
+      series: [{ name: 'Receitas', color: '2E9D6A', ...resCol(1, t => t.Receita) }, { name: 'Gastos', color: 'E4572E', ...resCol(5, t => t.gastos) }] });
+    charts.push({ type: 'line', title: 'Taxa de poupança por mês', from: [5, ch0], to: [9, ch0 + CH], cat: catMonths, axFmt: '0%', fmt: '0.0%', markers: true,
+      series: [{ name: 'Taxa de poupança', color: '1F5FD1', ...resCol(7, t => t.Receita > 0 ? t.taxa : null) }] });
+  }
+  if (spendCats.length) charts.push({ type: 'bar', title: 'Onde vai o dinheiro (10 maiores categorias)', from: [1, ch0 + CH + 1], to: [5, ch0 + 2 * CH + 1],
+    cat: { ref: xlRef('Painel', 10, 5, 10, 4 + spendCats.length), vals: spendCats.map(([c]) => c) },
+    series: [{ name: 'Total', color: '6D5EF6', ref: xlRef('Painel', 11, 5, 11, 4 + spendCats.length), vals: spendCats.map(([, v]) => v) }] });
+  if (all.Receita || all.gastos) charts.push({ type: 'pie', title: 'Para onde foi o dinheiro', from: [5, ch0 + CH + 1], to: [9, ch0 + 2 * CH + 1], colors: ['F59E0B', 'E4572E', '9CA3AF', '2E9D6A'],
+    cat: { ref: xlRef('Painel', 10, pieR, 10, pieR + 3), vals: pieItems.map(([l]) => l) },
+    series: [{ name: 'Total', ref: xlRef('Painel', 11, pieR, 11, pieR + 3), vals: pieItems.map(([, t]) => all[t] || 0) }] });
+  const painel = { name: 'Painel', tab: '1E3A8A', noGrid: true, cols: [2, 15, 15, 15, 15, 15, 15, 15, 15, 3, 26, 14], rows: P, merges: M, heights, charts,
+    valid: [{ type: 'date', op: 'greaterThan', f: '36526', ref: 'D4', title: 'Mês em análise', prompt: 'Escreva o dia 1 do mês, ex.: 01/10/2026.', error: 'Escreva uma data, ex.: 01/10/2026.' }],
+    cf: [{ ref: 'F8:G8 F15:G15 F18:G18 F11:G11', rules: [{ op: 'lessThan', v: '0', dxf: 0 }] }] };
+
+  const sheets = [painel, movSheet, resSheet];
+  const names = [{ name: 'ListaCategorias', ref: 'tCategorias[Categoria]' }, { name: 'MesAnalise', ref: `'Painel'!$D$4` }, { name: 'NMeses', ref: `MAX(1,COUNT('${RES}'!$A$2:$A$${Math.max(2, lastR)}))` }];
+
+  // ---- Anual
+  const years = [...new Set(months.map(k => k.slice(0, 4)))].sort();
+  if (full && years.length) {
+    const rng = c => `'${RES}'!$${c}$2:$${c}$${lastR}`, yr = (r, c) => `SUMPRODUCT((YEAR(${rng('A')})=$A${r})*${rng(c)})`;
+    const yt = y => totalsOf(tx.filter(x => x.d.startsWith(y)));
+    const yRows = [H(['Ano', 'Receitas', 'Despesas variáveis', 'Contas fixas', 'Dívidas', 'Total gastos', 'Sobrou', 'Taxa de poupança', 'Poupança e investimento', 'Meses com dados'])].concat(years.map((y, i) => {
+      const r = i + 2, t = yt(y);
+      return [{ v: +y, s: 'b' }, { f: yr(r, 'B'), v: r2(t.Receita), s: 'eur' }, { f: yr(r, 'C'), v: r2(t.Despesa), s: 'eur' }, { f: yr(r, 'D'), v: r2(t['Conta fixa']), s: 'eur' }, { f: yr(r, 'E'), v: r2(t.Dívida), s: 'eur' },
+        { f: `C${r}+D${r}+E${r}`, v: r2(t.gastos), s: 'eur' }, { f: `B${r}-F${r}`, v: r2(t.poupado), s: 'eur' }, { f: `IF(B${r}>0,G${r}/B${r},"")`, v: t.Receita > 0 ? t.taxa : '', s: 'pct' },
+        { f: yr(r, 'I'), v: r2(t.Poupança), s: 'eur' }, { f: `SUMPRODUCT((YEAR(${rng('A')})=$A${r})*(${rng('B')}+${rng('F')}>0))`, v: months.filter(k => k.startsWith(y) && (byM[k] || []).length).length, s: 'int' }];
+    }));
+    const yN = years.length;
+    sheets.push({ name: 'Anual', tab: '0EA5E9', cols: [10, 14, 18, 14, 12, 14, 14, 16, 22, 16], rows: yRows, freeze: { r: 1, c: 1 },
+      cf: [{ ref: `G2:G${yN + 1}`, rules: [{ op: 'lessThan', v: '0', dxf: 0 }] }],
+      charts: [{ type: 'col', title: 'Ano a ano', from: [0, yN + 3], to: [8, yN + 22], cat: { ref: xlRef('Anual', 0, 2, 0, yN + 1), vals: years.map(Number), num: true, fmt: '0' },
+        series: [{ name: 'Receitas', color: '2E9D6A', ref: xlRef('Anual', 1, 2, 1, yN + 1), vals: years.map(y => yt(y).Receita) }, { name: 'Gastos', color: 'E4572E', ref: xlRef('Anual', 5, 2, 5, yN + 1), vals: years.map(y => yt(y).gastos) },
+          { name: 'Sobrou', color: '1F5FD1', ref: xlRef('Anual', 6, 2, 6, yN + 1), vals: years.map(y => yt(y).poupado) }] }] });
+  }
+  sheets.push(catSheet);
+
+  if (full) {
+    // ---- Contas
+    const aRows = [H(['Banco', 'Produto', 'Saldo', 'TANB', 'Juros pagos', 'Retenção IRS', 'Taxa líquida efetiva', 'Juros líquidos por ano', 'Juros líquidos por mês', 'Conta do dia a dia'])]
+      .concat(accs.map(a => { const c = accCalc(a); return [a.bank, a.product, { v: +a.balance || 0, s: 'eur' }, { v: +a.tanb || 0, s: 'pct' }, a.cap, a.irs ? 'Sim' : 'Não', { v: c.eff, s: 'pct' }, { v: r2(c.year), s: 'eur' }, { v: r2(c.month), s: 'eur' }, a.auto ? `Sim, desde ${dayShort(a.auto.d)}` : '']; }));
+    if (accs.length) aRows.push([], [{ v: 'Total', s: 'tot' }, { s: 'tot' }, { f: `SUBTOTAL(109,tContas[Saldo])`, v: r2(accs.reduce((s, a) => s + (+a.balance || 0), 0)), s: 'teur' }, { s: 'tot' }, { s: 'tot' }, { s: 'tot' }, { s: 'tot' },
+      { f: `SUBTOTAL(109,tContas[Juros líquidos por ano])`, v: r2(accs.reduce((s, a) => s + accCalc(a).year, 0)), s: 'teur' }, { f: `SUBTOTAL(109,tContas[Juros líquidos por mês])`, v: r2(accs.reduce((s, a) => s + accCalc(a).month, 0)), s: 'teur' }, { s: 'tot' }]);
+    sheets.push({ name: 'Contas', tab: 'F59E0B', cols: [20, 22, 14, 9, 13, 13, 19, 21, 21, 20], rows: aRows,
+      table: { name: 'tContas', rows: accs.length, style: 'TableStyleMedium4', cols: ['Banco', 'Produto', 'Saldo', 'TANB', 'Juros pagos', 'Retenção IRS', 'Taxa líquida efetiva', 'Juros líquidos por ano', 'Juros líquidos por mês', 'Conta do dia a dia'].map(name => ({ name })) } });
+    // ---- Contas histórico
+    const hist = (S.accounts.history || []).slice().sort((a, b) => a.d.localeCompare(b.d));
+    const hRows = [H(['Data', 'Total em contas'])].concat(hist.map(h => [{ v: h.d, s: 'date' }, { v: r2(h.total), s: 'eur' }]));
+    sheets.push({ name: 'Contas histórico', tab: 'F59E0B', cols: [12, 18], rows: hRows, table: { name: 'tContasHist', rows: hist.length, style: 'TableStyleMedium4', cols: [{ name: 'Data' }, { name: 'Total em contas' }] },
+      charts: hist.length > 1 ? [{ type: 'line', title: 'Total em contas', from: [3, 1], to: [12, 20], cat: { ref: xlRef('Contas histórico', 0, 2, 0, hist.length + 1), vals: hist.map(h => xlSerial(h.d)), num: true, fmt: 'mmm yy' },
+        series: [{ name: 'Total em contas', color: 'F59E0B', ref: xlRef('Contas histórico', 1, 2, 1, hist.length + 1), vals: hist.map(h => h.total) }] }] : [] });
+    // ---- Investimentos: A Investimento, B Tipo, C Descrição, D Investido, E Valor atual, F Ganho, G Ganho %, H Peso, I Unidades, J Preço médio, K Custo anual, L Dividendos, M Último registo
+    const iR = EC.rows;
+    const iRows = [H(['Investimento', 'Tipo', 'Descrição', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso', 'Unidades', 'Preço médio', 'Custo anual', 'Dividendos', 'Último registo'])]
+      .concat(iR.map((r, i) => { const n = i + 2, totV = iR.reduce((s, x) => s + x.val, 0); return [r.key, kindOf(r), r.name || '', { v: r2(r.inv), s: 'eur' }, { v: r2(r.val), s: 'eur' }, { f: `E${n}-D${n}`, v: r2(r.val - r.inv), s: 'eur' },
+        { f: `IF(D${n}>0,F${n}/D${n},"")`, v: r.inv > 0 ? (r.val - r.inv) / r.inv : '', s: 'pct' }, { f: `IF(SUM(tInvest[Valor atual])>0,E${n}/SUM(tInvest[Valor atual]),"")`, v: totV > 0 ? r.val / totV : '', s: 'pct' },
+        r.units > 0 ? +r.units : '', r.avg > 0 ? { v: +r.avg, s: 'eur' } : '', { v: r.ter || 0, s: 'pct' }, { v: r.div || 0, s: 'pct' }, r.lastD ? { v: r.lastD, s: 'date' } : '']; }));
+    if (iR.length) iRows.push([], [{ v: 'Total', s: 'tot' }, { s: 'tot' }, { s: 'tot' }, { f: 'SUBTOTAL(109,tInvest[Investido])', v: r2(iR.reduce((s, x) => s + x.inv, 0)), s: 'teur' }, { f: 'SUBTOTAL(109,tInvest[Valor atual])', v: r2(iR.reduce((s, x) => s + x.val, 0)), s: 'teur' },
+      { f: `E${iR.length + 3}-D${iR.length + 3}`, v: r2(iR.reduce((s, x) => s + x.val - x.inv, 0)), s: 'teur' }, { f: `IF(D${iR.length + 3}>0,F${iR.length + 3}/D${iR.length + 3},"")`, v: '', s: 'tpct' }, ...Array(6).fill({ s: 'tot' })]);
+    const sumInv = iR.reduce((s, x) => s + x.inv, 0); if (iR.length && sumInv > 0) iRows[iR.length + 2][6].v = iR.reduce((s, x) => s + x.val - x.inv, 0) / sumInv;
+    sheets.push({ name: 'Investimentos', tab: '10B981', cols: [16, 10, 40, 14, 14, 13, 10, 9, 11, 13, 12, 12, 14], rows: iRows,
+      table: { name: 'tInvest', rows: iR.length, style: 'TableStyleMedium7', cols: ['Investimento', 'Tipo', 'Descrição', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso', 'Unidades', 'Preço médio', 'Custo anual', 'Dividendos', 'Último registo'].map(name => ({ name })) },
+      cf: [{ ref: `F2:G${iR.length + 3}`, rules: [{ op: 'lessThan', v: '0', dxf: 0 }, { op: 'greaterThan', v: '0', dxf: 1 }] }],
+      charts: iR.length ? [{ type: 'bar', title: 'Investido e valor atual', from: [0, iR.length + 4], to: [6, iR.length + 4 + Math.max(12, iR.length * 2 + 4)],
+        cat: { ref: xlRef('Investimentos', 0, 2, 0, iR.length + 1), vals: iR.map(r => r.key) },
+        series: [{ name: 'Investido', color: '9CA3AF', ref: xlRef('Investimentos', 3, 2, 3, iR.length + 1), vals: iR.map(r => r.inv) }, { name: 'Valor atual', color: '10B981', ref: xlRef('Investimentos', 4, 2, 4, iR.length + 1), vals: iR.map(r => r.val) }] }] : [] });
+    // ---- Evolução dos investimentos: per date, total put in so far and total value (each investment keeps its last known value)
+    const snaps = (S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || String(a.e).localeCompare(String(b.e)));
+    const last = {}, putIn = {}, evo = [];
+    for (let i = 0; i < snaps.length; i++) {
+      const x = snaps[i]; putIn[x.e] = (putIn[x.e] || 0) + (+x.inv || 0); if (x.val != null && x.val !== '') last[x.e] = +x.val || 0;
+      if (!snaps[i + 1] || snaps[i + 1].d !== x.d) evo.push([x.d, Object.values(putIn).reduce((a, b) => a + b, 0), Object.values(last).reduce((a, b) => a + b, 0)]);
+    }
+    const eRows = [H(['Data', 'Investido até à data', 'Valor', 'Ganho'])].concat(evo.map(([d, i, v], k) => [{ v: d, s: 'date' }, { v: r2(i), s: 'eur' }, { v: r2(v), s: 'eur' }, { f: `C${k + 2}-B${k + 2}`, v: r2(v - i), s: 'eur' }]));
+    sheets.push({ name: 'Evolução investimentos', tab: '10B981', cols: [12, 20, 14, 14], rows: eRows, table: { name: 'tEvolucao', rows: evo.length, style: 'TableStyleMedium7', cols: ['Data', 'Investido até à data', 'Valor', 'Ganho'].map(name => ({ name })) },
+      cf: [{ ref: `D2:D${evo.length + 1}`, rules: [{ op: 'lessThan', v: '0', dxf: 0 }, { op: 'greaterThan', v: '0', dxf: 1 }] }],
+      charts: evo.length > 1 ? [{ type: 'line', title: 'Investimentos: valor e dinheiro posto', from: [5, 1], to: [15, 21], cat: { ref: xlRef('Evolução investimentos', 0, 2, 0, evo.length + 1), vals: evo.map(e => xlSerial(e[0])), num: true, fmt: 'mmm yy' },
+        series: [{ name: 'Investido até à data', color: '9CA3AF', ref: xlRef('Evolução investimentos', 1, 2, 1, evo.length + 1), vals: evo.map(e => e[1]) }, { name: 'Valor', color: '10B981', ref: xlRef('Evolução investimentos', 2, 2, 2, evo.length + 1), vals: evo.map(e => e[2]) }] }] : [] });
+    // ---- Registos dos investimentos (raw)
+    const sRows = [H(['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'])].concat(snaps.map(x => [{ v: x.d, s: 'date' }, x.e, { v: r2(+x.inv || 0), s: 'eur' }, { v: r2(+x.val || 0), s: 'eur' }]));
+    sheets.push({ name: 'Registos investimentos', tab: '10B981', cols: [12, 16, 20, 16], rows: sRows, table: { name: 'tRegistos', rows: snaps.length, style: 'TableStyleLight9', cols: ['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'].map(name => ({ name })) } });
+  }
+  return { title: 'Livro de Contas' + (name ? ' · ' + name : ''), sheets, names };
 }
 async function exportXlsx(win, label) {
   try { await host.saveFile(`livro-de-contas-${label || today()}.xlsx`, xlsxFile(workbookData(win)), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
