@@ -173,6 +173,10 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
 .autobtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chip[aria-pressed="true"] .muted { color: inherit; opacity: .8; }
 .catmove { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; margin-top: 4px; border-radius: 10px; background: var(--accent-soft); }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--surface-2); }
+tr.click .chev { color: var(--muted); font-size: 0.8em; display: inline-block; width: 1em; }
+tr.sub > td { padding: 0 0 8px 1.2em; }
 .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; width: 34px; height: 34px; border-radius: 8px; }
 .x:hover { background: var(--surface-2); }
 /* home */
@@ -231,7 +235,7 @@ td .bar { height: 5px; background: var(--s1); border-radius: 99px; margin-top: 3
   nav.tabs button svg { width: 20px; height: 20px; }
   nav.tabs button:hover { background: var(--surface-2); }
   nav.tabs button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
-  nav.tabs button.desk { margin-top: auto; }
+  nav.tabs button.desk:last-child { margin-top: auto; }
   .hello .gear { display: none; }
   .home { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; gap: 18px; }
   .stack, .grid2 { gap: 18px; }
@@ -632,6 +636,29 @@ function splitBox() {
 }
 
 // ---------- views ----------
+// Summary of last month, shown on Início during the first 10 days of a month until closed.
+function reviewCard() {
+  const td = today(), prev = addMonths(monthKey(td), -1);
+  if (+td.slice(8) > 10 || S.settings.reviewSeen === prev) return '';
+  const items = S.months[prev] || []; if (!items.length) return '';
+  const t = totalsOf(items), isSp = c => ['Despesa', 'Conta fixa'].includes(catType(c));
+  const spent = t.Despesa + t['Conta fixa'], bud = budgetOf('Despesa') + budgetOf('Conta fixa');
+  const by = {}; for (const x of items) if (isSp(x.c)) by[x.c] = (by[x.c] || 0) + x.v;
+  const over = S.cats.filter(c => +c.budget > 0 && (by[c.name] || 0) > +c.budget).map(c => [c.name, by[c.name] - c.budget]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const before = (S.months[addMonths(prev, -1)] || []).filter(x => isSp(x.c)).reduce((a, x) => a + x.v, 0);
+  const put = (S.etfs.snaps || []).filter(x => monthKey(x.d) === prev).reduce((a, x) => a + (+x.inv || 0), 0)
+    + items.filter(x => catType(x.c) === 'Poupança' && !(x.lk && x.lk.e)).reduce((a, x) => a + x.v, 0);
+  const name = new Intl.DateTimeFormat('pt-PT', { month: 'long' }).format(parseD(prev + '-01'));
+  const line = (l, v, extra) => `<div class="top" style="display:flex;justify-content:space-between;gap:10px"><span>${l}</span><span class="num"><b>${v}</b>${extra || ''}</span></div>`;
+  return `<section class="card stack" style="gap:8px"><div class="cardhead"><h2>Resumo de ${esc(name)}</h2><button class="btn ghost small" data-act="review-ok">Fechar</button></div>
+    ${line('Gastos', eur(spent), bud > 0 ? ` <span class="muted">de ${eur0(bud)}</span> ${spent > bud ? `<span class="pill bad">▲ ${eur0(spent - bud)}</span>` : '<span class="pill good">dentro</span>'}` : '')}
+    ${before ? line(`Face a ${esc(new Intl.DateTimeFormat('pt-PT', { month: 'long' }).format(parseD(addMonths(prev, -1) + '-01')))}`, (spent > before ? '▲ ' : '▼ ') + pct(Math.abs(spent / before - 1))) : ''}
+    ${line('Receitas', eur(t.Receita))}
+    ${line('Sobrou', `<span style="color:${t.poupado < 0 ? 'var(--bad)' : 'inherit'}">${eur(t.poupado)}</span>`)}
+    ${put ? line('Posto de lado', eur(put)) : ''}
+    ${over.length ? `<div class="small"><b>Acima do orçamento:</b> ${over.map(([c, v]) => `${esc(c)} (+${eur0(v)})`).join(', ')}</div>` : '<div class="small muted">Nenhuma categoria passou do orçamento.</div>'}
+    <button class="btn small" data-act="open-month" data-v="${prev}">Ver ${esc(name)} em detalhe</button></section>`;
+}
 function viewInicio() {
   const now = new Date(), key = monthKey(today()), items = S.months[key] || [], t = totalsOf(items);
   const h = now.getHours(), greet = h < 6 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite';
@@ -663,10 +690,10 @@ function viewInicio() {
   const mName = new Intl.DateTimeFormat('pt-PT', { month: 'long' }).format(now);
   return `
   <div class="hello"><div><h1>${greet}${name ? ', ' + esc(name) : ''}</h1><div class="sub">${esc(cap(dayLong(td)))}</div></div>
-    <button class="gear" data-act="goto" data-v="ajustes" aria-label="Ajustes">${ic.gear}</button></div>
+    <div style="display:flex;gap:8px"><button class="gear" data-act="goto" data-v="procurar" aria-label="Procurar movimentos">${ICONS.procurar}</button><button class="gear" data-act="goto" data-v="ajustes" aria-label="Ajustes">${ic.gear}</button></div></div>
   <div class="home"><div class="stack">
     ${syncBanner()}
-    ${!allTx().length ? welcomeCard() : ''}
+    ${!allTx().length ? welcomeCard() : reviewCard()}
     <section class="home-hero">
       <div class="lbl"><span>Gastos de ${esc(mName)}</span><span>${left ? `faltam ${left} dia${left > 1 ? 's' : ''}` : 'último dia'}</span></div>
       <div><div class="big">${eur(spent)}</div>
@@ -818,9 +845,9 @@ function viewMes() {
       <div class="kpi"><div class="label">Sobrou</div><div class="v" style="color:${t.poupado < 0 ? 'var(--bad)' : 'inherit'}">${eur(t.poupado)}</div>${t.Poupança ? `<div class="h">${eur0(t.Poupança)} posto de lado</div>` : ''}</div>
       <div class="kpi"><div class="label">Taxa de poupança</div><div class="v">${pct(t.taxa)}</div>${proj != null ? `<div class="h">Projeção de gastos: ${eur0(proj)} ${proj > budAll ? '<span class="pill warn">acima do orç.</span>' : '<span class="pill good">dentro do orç.</span>'}</div>` : ''}</div>
     </div>
-    <section class="card"><h2>Gastos por categoria</h2><div class="tbl-wrap"><table>
+    <section class="card"><h2>Gastos por categoria</h2><p class="small muted" style="margin:-6px 0 6px">Toque numa categoria para ver os movimentos.</p><div class="tbl-wrap"><table>
       <thead><tr><th>Categoria</th><th class="r">Valor</th><th class="r">% dos gastos</th></tr></thead>
-      <tbody>${spendRank.map(([c, v]) => `<tr><td>${esc(c)}${catType(c) === 'Despesa' ? '' : ` <span class="muted small">${esc(catType(c).toLowerCase())}</span>`}<div class="bar" style="width:${(v / topSpend * 100).toFixed(1)}%"></div></td><td class="r">${eur(v)}</td><td class="r">${pct(t.gastos ? v / t.gastos : NaN)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Sem gastos neste mês.</td></tr>'}</tbody>
+      <tbody>${spendRank.map(([c, v]) => `<tr class="click" data-act="cat-open" data-v="${esc(c)}" aria-expanded="${UI.catOpen === c}"><td><span class="chev">${UI.catOpen === c ? '▾' : '▸'}</span> ${esc(c)}${catType(c) === 'Despesa' ? '' : ` <span class="muted small">${esc(catType(c).toLowerCase())}</span>`}<div class="bar" style="width:${(v / topSpend * 100).toFixed(1)}%"></div></td><td class="r">${eur(v)}</td><td class="r">${pct(t.gastos ? v / t.gastos : NaN)}</td></tr>${UI.catOpen === c ? `<tr class="sub"><td colspan="3"><div class="list">${items.filter(x => x.c === c).sort((a, b) => b.d.localeCompare(a.d)).map(x => rowTx(x)).join('')}</div></td></tr>` : ''}`).join('') || '<tr><td colspan="3" class="muted">Sem gastos neste mês.</td></tr>'}</tbody>
       ${spendRank.length ? `<tfoot><tr><td><b>Total</b></td><td class="r"><b>${eur(t.gastos)}</b></td><td class="r"><b>100%</b></td></tr></tfoot>` : ''}
     </table></div></section>
     <div class="grid2">
@@ -831,6 +858,43 @@ function viewMes() {
       ${barChart({ labels: daily.map((_, i) => String(i + 1)), series: [{ color: 'var(--s1)', values: daily }], tips: daily.map((v, i) => `${i + 1} ${monthShort(key).split(' ')[0]}: ${eur(v)}`), h: 170 })}</section>
     <section class="card"><h2>Movimentos (${items.length})</h2>
       ${days.map(d => `<div class="dayhead">${esc(dayLong(d))}</div>${byDay[d].map(x => rowTx(x, false)).join('')}`).join('') || '<p class="empty">Sem movimentos neste mês.</p>'}</section>
+  </div>`;
+}
+
+// ---------- search ----------
+// Words match category, note, account and investment (accents and case ignored); a number matches the amount.
+const fold = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function viewProcurar() {
+  const q = (UI.q || '').trim(), per = UI.qPer || 'all', yNow = today().slice(0, 4), yPrev = String(+yNow - 1);
+  const pers = [['all', 'Tudo'], ['12', 'Últimos 12 meses'], [yNow, yNow], [yPrev, yPrev]];
+  const from12 = addMonths(monthKey(today()), -11);
+  const inPer = d => per === 'all' ? true : per === '12' ? monthKey(d) >= from12 : d.startsWith(per);
+  const isNum = /^[\d\s.,€-]+$/.test(q) && parseAmount(q) > 0, num = parseAmount(q), toks = fold(q).split(/\s+/).filter(Boolean);
+  const hit = x => isNum ? Math.abs(x.v - num) < 0.005 || Math.abs((+x.tt || 0) - num) < 0.005
+    : toks.every(t => fold([x.c, x.n, x.m, catType(x.c), x.lk && x.lk.e].join(' ')).includes(t));
+  const res = q ? allTx().filter(x => inPer(x.d) && hit(x)).sort((a, b) => b.d.localeCompare(a.d) || b.id.localeCompare(a.id)) : [];
+  const out = res.filter(x => catType(x.c) !== 'Receita').reduce((a, x) => a + x.v, 0), inn = res.filter(x => catType(x.c) === 'Receita').reduce((a, x) => a + x.v, 0);
+  const byM = {}; for (const x of res.slice(0, 300)) (byM[monthKey(x.d)] = byM[monthKey(x.d)] || []).push(x);
+  const cats = {}; for (const x of res) cats[x.c] = (cats[x.c] || 0) + x.v;
+  const catList = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  return `
+  <header class="top"><h1>Procurar</h1><button class="btn ghost small" data-act="goto" data-v="inicio">‹ Início</button></header>
+  <div class="stack">
+    <section class="card stack">
+      <input id="q" class="inp" type="search" placeholder="ex.: continente, jantar, carro ou 12,50" value="${esc(UI.q || '')}" autocomplete="off" aria-label="Procurar movimentos">
+      <div class="chips">${pers.map(([k, l]) => `<button class="chip" data-act="q-per" data-v="${k}" aria-pressed="${per === k}">${l}</button>`).join('')}</div>
+      <p class="small muted" style="margin:0">Procura na categoria, na nota, na conta e no investimento. Escreva um valor (ex.: 12,50) para procurar pelo montante.</p>
+    </section>
+    ${!q ? '' : !res.length ? '<section class="card"><p class="empty">Nada encontrado.</p></section>' : `
+    <div class="kpis k3">
+      <div class="kpi"><div class="label">Movimentos</div><div class="v">${res.length}</div></div>
+      <div class="kpi"><div class="label">Saídas</div><div class="v">${eur(out)}</div>${res.length > 1 ? `<div class="h">média ${eur(out / Math.max(1, res.length - res.filter(x => catType(x.c) === 'Receita').length))}</div>` : ''}</div>
+      <div class="kpi"><div class="label">Entradas</div><div class="v">${eur(inn)}</div></div>
+    </div>
+    <div class="${catList.length > 1 ? 'grid2' : 'stack'}">
+      <section class="card"><h2>Resultados</h2>${Object.keys(byM).map(k => `<div class="dayhead" style="text-transform:none">${esc(monthLong(k).replace(/^./, c => c.toUpperCase()))}</div>${byM[k].map(x => rowTx(x)).join('')}`).join('')}${res.length > 300 ? '<p class="small muted">Mostram-se os 300 mais recentes.</p>' : ''}</section>
+      ${catList.length > 1 ? `<section class="card"><h2>Por categoria</h2><table><tbody>${catList.map(([c, v]) => `<tr><td>${esc(c)}</td><td class="r">${eur(v)}</td></tr>`).join('')}</tbody></table></section>` : ''}
+    </div>`}
   </div>`;
 }
 
@@ -1060,19 +1124,22 @@ function etfEdit(r, kind) {
     ${r ? `<button class="btn danger small" type="button" data-act="etf-del" data-key="${esc(r.key)}">${UI.confirmEtf ? 'Confirmar: remover e apagar os seus registos' : 'Remover'}</button>` : ''}
   </form>`;
 }
+// What the account form shows: for the everyday account, the balance on the day the count starts
+// (so it is not reset to today by mistake); for a balance typed today, today's balance.
+const accStart = a => a.auto ? { d: a.auto.d, bal: a.auto.d === today() ? +a.balance : +a.auto.bal } : { d: today(), bal: +a.balance };
 function accFlowText(a) { const f = flowOf(a, a.auto.d, today()); return `entraram ${eur(f.inn)} e saíram ${eur(f.out)}`; }
 function accEdit(a) {
   const id = esc(a.id);
   return `<form class="edit" data-acc="${id}" autocomplete="off">
     <div class="row2"><div class="field"><label class="small" for="acc-bank-${id}">Banco</label><input id="acc-bank-${id}" value="${esc(a.bank)}"></div>
     <div class="field"><label class="small" for="acc-prod-${id}">Produto</label><input id="acc-prod-${id}" value="${esc(a.product)}"></div></div>
-    <div class="row2"><div class="field"><label class="small" for="acc-bal-${id}">Saldo (€)</label><input id="acc-bal-${id}" inputmode="decimal" value="${esc(String(a.balance).replace('.', ','))}"></div>
+    <div class="row2"><div class="field"><label class="small" for="acc-bal-${id}">${a.auto ? 'Saldo nesse dia (€)' : 'Saldo (€)'}</label><input id="acc-bal-${id}" inputmode="decimal" value="${esc(String(accStart(a).bal).replace('.', ','))}"></div>
     <div class="field"><label class="small" for="acc-tanb-${id}">TANB (%)</label><input id="acc-tanb-${id}" inputmode="decimal" value="${esc(String(+(a.tanb * 100).toFixed(3)).replace('.', ','))}"></div></div>
     <div class="row2"><div class="field"><label class="small" for="acc-cap-${id}">Juros pagos</label><select id="acc-cap-${id}">${Object.keys(CAPN).map(k => `<option ${a.cap === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
     <div class="field"><label class="small" for="acc-irs-${id}">Retenção IRS</label><select id="acc-irs-${id}"><option value="1" ${a.irs ? 'selected' : ''}>Sim (${pct(S.settings.irs)})</option><option value="0" ${a.irs ? '' : 'selected'}>Não</option></select></div></div>
     <div class="row2"><div class="field"><label class="small" for="acc-auto-${id}">Despesas e receitas mexem no saldo</label><select id="acc-auto-${id}"><option value="1" ${a.auto ? 'selected' : ''}>Sim, é a conta do dia a dia</option><option value="0" ${a.auto ? '' : 'selected'}>Não</option></select></div>
-    <div class="field"><label class="small" for="acc-date-${id}">Este saldo é do dia</label><input type="date" id="acc-date-${id}" value="${today()}" max="${today()}"></div></div>
-    <p class="small muted" style="margin:0">${a.auto ? `Desde ${esc(dayShort(a.auto.d))} ${a.auto.d.slice(0, 4)} (${eur(a.auto.bal)} no início do dia): ${accFlowText(a)}. Se o saldo no banco for outro, escreva-o aqui com a data de hoje.` : 'Com Sim, as despesas, contas fixas, poupanças e receitas que registar passam a sair desta conta ou a entrar nela, e o saldo atualiza-se sozinho. Para um saldo de outro dia (ex.: o início do mês), escolha esse dia: os movimentos registados desde então entram na conta.'}</p>
+    <div class="field"><label class="small" for="acc-date-${id}">Este saldo é do dia</label><input type="date" id="acc-date-${id}" value="${accStart(a).d}" max="${today()}"></div></div>
+    <p class="small muted" style="margin:0">${a.auto ? `Desde ${esc(dayShort(a.auto.d))} ${a.auto.d.slice(0, 4)} (${eur(a.auto.bal)} no início do dia): ${accFlowText(a)}, saldo agora <b>${eur(a.balance)}</b>. Se o saldo no banco for outro, escreva o saldo de hoje com a data de hoje.` : 'Com Sim, as despesas, contas fixas, poupanças e receitas que registar passam a sair desta conta ou a entrar nela, e o saldo atualiza-se sozinho. Para um saldo de outro dia (ex.: o início do mês), escolha esse dia: os movimentos registados desde então entram na conta.'}</p>
     <div class="row2"><button class="btn" type="submit">Guardar</button><button class="btn" type="button" data-act="acc-close">Cancelar</button></div>
     <button class="btn danger small" type="button" data-act="acc-del" data-id="${id}">${UI.confirmAcc === a.id ? 'Confirmar remover conta' : 'Remover conta'}</button>
   </form>`;
@@ -1265,20 +1332,21 @@ const ICONS = {
   mes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
   ano: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20v-9M20 20V4"/></svg>',
   patrimonio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/></svg>',
+  procurar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>',
   ajustes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
 };
 const TABS = [['inicio', 'Início'], ['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património']];
 function renderTabs() {
   // On a computer screen the bar becomes a side menu, with the app name on top and Ajustes at the bottom.
   const btn = ([k, l], cls) => `<button type="button" data-tab="${k}" ${cls ? `class="${cls}"` : ''} ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`;
-  document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + TABS.map(t => btn(t)).join('') + btn(['ajustes', 'Ajustes'], 'desk');
+  document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + TABS.map(t => btn(t)).join('') + btn(['procurar', 'Procurar'], 'desk') + btn(['ajustes', 'Ajustes'], 'desk');
 }
 function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
   refreshMain();
   const a = document.activeElement, aid = a && a.id, sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
   const html = (S.dbState === 'off' ? '<div class="banner">' + offMsg() + '</div>' : '') +
-    ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes }[view])();
+    ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes, procurar: viewProcurar }[view] || viewInicio)();
   document.getElementById('app').innerHTML = html;
   renderTabs();
   fitCharts();
@@ -1324,6 +1392,9 @@ app.addEventListener('click', e => {
   else if (act === 'prev-m') { curMonth = addMonths(curMonth, -1); render(); }
   else if (act === 'next-m') { curMonth = addMonths(curMonth, 1); render(); }
   else if (act === 'year') { yearSel = v; render(); }
+  else if (act === 'review-ok') { S.settings.reviewSeen = addMonths(monthKey(today()), -1); saveSettings(); render(); }
+  else if (act === 'q-per') { UI.qPer = v; render(); }
+  else if (act === 'cat-open') { UI.catOpen = UI.catOpen === v ? null : v; render(); }
   else if (act === 'open-month') { tip.hidden = true; curMonth = v; go('mes'); }
   else if (act === 'acc-open') { UI.openAcc = b.dataset.id; UI.confirmAcc = null; render(); }
   else if (act === 'acc-close') { UI.openAcc = null; render(); }
@@ -1356,6 +1427,7 @@ app.addEventListener('click', e => {
 });
 app.addEventListener('input', e => {
   const id = e.target.id;
+  if (id === 'q') { UI.q = e.target.value; render(); return; }
   if (id === 'f-amount') { F.amount = e.target.value; refreshSave(); }
   else if (id === 'f-note') F.note = e.target.value;
   else if (id === 'f-newinv') { F.newInv = e.target.value; refreshSave(); }
@@ -1426,7 +1498,7 @@ app.addEventListener('submit', e => {
     const bal = parseAmount(g('bal')), tanb = parseAmount(g('tanb'));
     if (!(bal >= 0) || !(tanb >= 0)) { toast('Saldo ou TANB inválido: use números, ex.: 2500,50 e 1,5.'); return; }
     const autoOn = g('auto') === '1', d = g('date') || today(), td = today();
-    const keep = a.auto && d === td && bal === +a.balance; // only bank/rate changed: keep the starting point
+    const st = accStart(a), keep = a.auto && d === st.d && bal === st.bal; // only bank/rate changed: keep the starting point
     if (autoOn && d > td) { toast('A data do saldo não pode ser depois de hoje.'); return; }
     Object.assign(a, { bank: g('bank').trim() || a.bank, product: g('prod').trim(), balance: bal, tanb: tanb / 100, cap: g('cap'), irs: g('irs') === '1' });
     if (!autoOn) delete a.auto;
