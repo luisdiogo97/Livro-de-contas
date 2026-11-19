@@ -1785,7 +1785,7 @@ function workbookData(win) {
   // rows 1-3: title, a link that jumps to the first free row under the table, and how to use it; the table starts at row 4
   const lastD = tx.length ? tx[tx.length - 1].d : '';
   const movTop = [
-    [{ v: 'Movimentos', s: 'title' }, null, { f: `HYPERLINK("#'${MOV}'!A"&(ROWS(tMovimentos)+5),"➕  Adicionar movimento")`, v: '➕  Adicionar movimento', s: 'btn' }, { s: 'btn' }, { v: 'Último movimento', s: 'lbl' }, { f: 'MAX(tMovimentos[Data])', v: lastD, s: 'date' }],
+    [{ v: 'Movimentos', s: 'title' }, null, { f: `HYPERLINK("#'${MOV}'!A"&(ROWS(tMovimentos[Data])+5),"➕  Adicionar movimento")`, v: '➕  Adicionar movimento', s: 'btn' }, { s: 'btn' }, { v: 'Último movimento', s: 'lbl' }, { f: 'MAX(tMovimentos[Data])', v: lastD, s: 'date' }],
     [{ v: 'Carregue em "Adicionar movimento": vai direto à primeira linha livre da tabela. Escreva a data, escolha a categoria na lista e o valor (a nota e o meio são opcionais). O tipo, o mês e a natureza preenchem-se sozinhos.', s: 'wrap' }],
     [],
   ];
