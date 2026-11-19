@@ -852,7 +852,7 @@ function viewMes() {
   const byDay = {}; for (const x of items.slice().reverse()) (byDay[x.d] = byDay[x.d] || []).push(x);
   const days = Object.keys(byDay).sort().reverse();
   return `
-  <header class="top"><h1>Mês</h1></header>
+  <header class="top"><h1>Mês</h1>${xlBtn()}</header>
   <div class="stack">
     <div class="monthnav"><button class="iconbtn" data-act="prev-m" aria-label="Mês anterior" ${key <= first ? 'disabled' : ''}>‹</button><b>${esc(monthLong(key))}</b><button class="iconbtn" data-act="next-m" aria-label="Mês seguinte" ${key >= monthKey(today()) ? 'disabled' : ''}>›</button></div>
     <div class="kpis k4">
@@ -956,7 +956,7 @@ function viewAno() {
     </div>`;
   if (!items.length) return `<header class="top"><h1>Ano</h1></header><div class="stack">${chips}<section class="card"><p class="empty">Ainda não há movimentos neste período. Os totais, as médias mensais e os gráficos aparecem aqui assim que registar despesas e receitas.</p></section></div>`;
   return `
-  <header class="top"><h1>Ano</h1></header>
+  <header class="top"><h1>Ano</h1>${xlBtn()}</header>
   <div class="stack">
     ${chips}
     <div class="kpis k3">
@@ -1440,6 +1440,7 @@ app.addEventListener('click', e => {
   else if (act === 'cat-del' && allTx().some(x => x.c === S.cats[+b.dataset.i]?.name)) { const i = +b.dataset.i; UI.catMove = UI.catMove === i ? null : i; render(); const el = document.getElementById('cm-to-' + i); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
   else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; UI.catMove = null; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
+  else if (act === 'export-per') exportPeriod();
   else if (act === 'backup') doBackup();
   else if (act === 'sync-on') window.LDC.sync.connect();
   else if (act === 'sync-now') window.LDC.sync.syncNow();
@@ -1623,12 +1624,14 @@ function xlsxFile(sheets) {
   ];
   return zipStore(files);
 }
-function workbookData() {
+// win = list of month keys to export only that period (a month or a year); none = everything.
+function workbookData(win) {
   const H = a => a.map(v => ({ v, s: 'h' })), E = v => ({ v: Math.round(v * 100) / 100, s: 'eur' }), P = v => ({ v, s: 'pct' });
-  const tx = allTx().slice().sort((a, b) => a.d.localeCompare(b.d) || a.id.localeCompare(b.id));
+  const inWin = k => !win || win.includes(k);
+  const tx = allTx().filter(x => inWin(x.d.slice(0, 7))).slice().sort((a, b) => a.d.localeCompare(b.d) || a.id.localeCompare(b.id));
   const natOf = c => (S.cats.find(k => k.name === c) || {}).nature || '';
   const mov = [H(['Data', 'Mês', 'Tipo', 'Categoria', 'Valor', 'Nota', 'Natureza'])].concat(tx.map(x => [{ v: x.d, s: 'date' }, { v: x.d.slice(0, 7), s: 'month' }, catType(x.c), x.c, E(x.v), x.n || '', natOf(x.c)]));
-  const keys = Object.keys(S.months).filter(k => S.months[k].length).sort();
+  const keys = Object.keys(S.months).filter(k => S.months[k].length && inWin(k)).sort();
   const per = keys.map(k => [k, totalsOf(S.months[k])]);
   const sum = f => per.reduce((a, [, t]) => a + f(t), 0), n = per.length || 1;
   const mrow = (t, lbl, st) => [lbl, (st === 'b' ? { v: t.Receita, s: 'beur' } : E(t.Receita)), E(t.Despesa), E(t['Conta fixa']), E(t.Dívida), (st === 'b' ? { v: t.gastos, s: 'beur' } : E(t.gastos)), E(t.poupado), { v: t.taxa, s: st === 'b' ? 'bpct' : 'pct' }, E(t.Poupança)];
@@ -1639,7 +1642,13 @@ function workbookData() {
   const byCat = {}; for (const x of tx) byCat[x.c] = (byCat[x.c] || 0) + x.v;
   const catNames = [...new Set([...S.cats.map(c => c.name), ...Object.keys(byCat)])];
   const cats = [H(['Categoria', 'Tipo', 'Natureza', 'Orçamento mensal', 'Total', 'Média mensal', 'Movimentos'])]
-    .concat(catNames.map(c => { const k = S.cats.find(z => z.name === c) || {}; return [c, catType(c), k.nature || '', E(+k.budget || 0), E(byCat[c] || 0), E((byCat[c] || 0) / n), tx.filter(x => x.c === c).length]; }));
+    .concat(catNames.filter(c => !win || byCat[c]).map(c => { const k = S.cats.find(z => z.name === c) || {}; return [c, catType(c), k.nature || '', E(+k.budget || 0), E(byCat[c] || 0), E((byCat[c] || 0) / n), tx.filter(x => x.c === c).length]; }));
+  const base = [
+    { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
+    { name: 'Resumo mensal', cols: [12, 13, 18, 14, 12, 14, 13, 16, 22], rows: mensal, filterTo: per.length + 1 },
+    { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
+  ];
+  if (win) return base;
   const accs = S.accounts.accounts || [];
   const contas = [H(['Banco', 'Produto', 'Saldo', 'TANB', 'Juros pagos', 'Retenção IRS', 'Taxa líquida efetiva', 'Juros líquidos por ano', 'Juros líquidos por mês'])]
     .concat(accs.map(a => { const c = accCalc(a); return [a.bank, a.product, E(+a.balance || 0), P(+a.tanb || 0), a.cap, a.irs ? 'Sim' : 'Não', P(c.eff), E(c.year), E(c.month)]; }))
@@ -1649,20 +1658,24 @@ function workbookData() {
   const etfs = [H(['Investimento', 'Tipo', 'Descrição', 'Custo anual', 'Dividendos', 'Peso alvo', 'Investido', 'Valor atual', 'Ganho', 'Ganho %', 'Peso no tipo', 'Último registo', 'Unidades', 'Preço médio'])]
     .concat(EC.rows.map(r => [r.key, kindOf(r), r.name || '', P(r.ter || 0), P(r.div || 0), P(r.target || 0), E(r.inv), E(r.val), E(r.gain), P(r.g), P(r.w), r.lastD ? { v: r.lastD, s: 'date' } : '', r.units > 0 ? +r.units : '', r.avg > 0 ? E(+r.avg) : '']));
   const snaps = [H(['Data', 'Investimento', 'Investido nesse dia', 'Valor nesse dia'])].concat((S.etfs.snaps || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.e.localeCompare(b.e)).map(x => [{ v: x.d, s: 'date' }, x.e, E(+x.inv || 0), E(+x.val || 0)]));
-  return [
-    { name: 'Movimentos', cols: [12, 11, 12, 22, 12, 34, 13], rows: mov },
-    { name: 'Resumo mensal', cols: [12, 13, 18, 14, 12, 14, 13, 16, 22], rows: mensal, filterTo: per.length + 1 },
-    { name: 'Categorias', cols: [24, 12, 13, 18, 13, 14, 12], rows: cats },
+  return [...base,
     { name: 'Contas', cols: [18, 20, 13, 9, 12, 13, 18, 20, 20], rows: contas, filterTo: accs.length + 1 },
     { name: 'Contas histórico', cols: [12, 16], rows: histo },
     { name: 'Investimentos', cols: [14, 10, 40, 12, 11, 10, 13, 13, 12, 10, 11, 14, 11, 12], rows: etfs },
     { name: 'Investimentos registos', cols: [12, 14, 20, 16], rows: snaps },
   ];
 }
-async function exportXlsx() {
-  try { await host.saveFile(`livro-de-contas-${today()}.xlsx`, xlsxFile(workbookData()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+async function exportXlsx(win, label) {
+  try { await host.saveFile(`livro-de-contas-${label || today()}.xlsx`, xlsxFile(workbookData(win)), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
   catch (e) { toast('A exportação foi cancelada ou não está disponível.'); }
 }
+// The month on screen in Mês, or the year (or last 12 months) on screen in Ano.
+function exportPeriod() {
+  if (view === 'mes') return exportXlsx([curMonth], curMonth);
+  const win = yearWindow();
+  return exportXlsx(win, yearSel === 'last12' ? `${win[0]}-a-${win[11]}` : yearSel);
+}
+const xlBtn = () => host.saveFile ? '<button class="btn ghost small" data-act="export-per" title="Exportar este período para Excel">⤓ Excel</button>' : '';
 
 // ---------- boot ----------
 
