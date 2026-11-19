@@ -392,10 +392,22 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // the app (totals, charts, export, sync) keeps reading one number.
 const mainAcc = () => (S.accounts.accounts || []).find(a => a.auto && a.auto.d);
 const countsFor = (a, x) => x.lk && x.lk.a ? x.lk.a === a.id : !catKind(x.c);
+// The meal allowance (subsídio de alimentação) is paid onto another card, so it never enters this
+// account, and day-to-day spending (type Despesa) is paid from it first while it lasts.
+// Off unless the user turns it on: a.meal = the income category of the allowance ('' or unset = off).
+const mealCat = a => a.meal || '';
 function flowOf(a, from, to) {
-  let inn = 0, out = 0;
-  for (const x of allTx()) if (x.d >= from && x.d <= to && countsFor(a, x)) { if (catType(x.c) === 'Receita') inn += +x.v || 0; else out += +x.v || 0; }
-  return { inn: Math.round(inn * 100) / 100, out: Math.round(out * 100) / 100 };
+  let inn = 0, out = 0, card = 0, meal = 0;
+  const mc = mealCat(a), r2 = n => Math.round(n * 100) / 100;
+  const xs = allTx().filter(x => x.d >= from && x.d <= to && countsFor(a, x))
+    .sort((p, q) => p.d < q.d ? -1 : p.d > q.d ? 1 : (catType(q.c) === 'Receita') - (catType(p.c) === 'Receita'));
+  for (const x of xs) {
+    const v = +x.v || 0, t = catType(x.c);
+    if (t === 'Receita') { if (mc && x.c === mc) card = r2(card + v); else inn += v; }
+    else if (t === 'Despesa' && card > 0) { const take = Math.min(card, v); card = r2(card - take); meal += take; out += v - take; }
+    else out += v;
+  }
+  return { inn: r2(inn), out: r2(out), meal: r2(meal), card };
 }
 function autoBalance(a) { const f = flowOf(a, a.auto.d, today()); return Math.round(((+a.auto.bal || 0) + f.inn - f.out) * 100) / 100; }
 function refreshMain() {
@@ -1127,7 +1139,7 @@ function etfEdit(r, kind) {
 // What the account form shows: for the everyday account, the balance on the day the count starts
 // (so it is not reset to today by mistake); for a balance typed today, today's balance.
 const accStart = a => a.auto ? { d: a.auto.d, bal: a.auto.d === today() ? +a.balance : +a.auto.bal } : { d: today(), bal: +a.balance };
-function accFlowText(a) { const f = flowOf(a, a.auto.d, today()); return `entraram ${eur(f.inn)} e saíram ${eur(f.out)}`; }
+function accFlowText(a) { const f = flowOf(a, a.auto.d, today()); return `entraram ${eur(f.inn)} e saíram ${eur(f.out)}` + (f.meal || f.card ? ` (mais ${eur(f.meal)} pagos com o subsídio, que ainda tem ${eur(f.card)})` : ''); }
 function accEdit(a) {
   const id = esc(a.id);
   return `<form class="edit" data-acc="${id}" autocomplete="off">
@@ -1139,6 +1151,8 @@ function accEdit(a) {
     <div class="field"><label class="small" for="acc-irs-${id}">Retenção IRS</label><select id="acc-irs-${id}"><option value="1" ${a.irs ? 'selected' : ''}>Sim (${pct(S.settings.irs)})</option><option value="0" ${a.irs ? '' : 'selected'}>Não</option></select></div></div>
     <div class="row2"><div class="field"><label class="small" for="acc-auto-${id}">Despesas e receitas mexem no saldo</label><select id="acc-auto-${id}"><option value="1" ${a.auto ? 'selected' : ''}>Sim, é a conta do dia a dia</option><option value="0" ${a.auto ? '' : 'selected'}>Não</option></select></div>
     <div class="field"><label class="small" for="acc-date-${id}">Este saldo é do dia</label><input type="date" id="acc-date-${id}" value="${accStart(a).d}" max="${today()}"></div></div>
+    <div class="field"><label class="small" for="acc-meal-${id}">Subsídio de alimentação (entra noutro cartão)</label><select id="acc-meal-${id}"><option value="">Não uso (entra tudo nesta conta)</option>${S.cats.filter(c => c.type === 'Receita').map(c => `<option ${mealCat(a) === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <p class="small muted meal-hint" style="margin:0">Se escolher uma categoria, esse subsídio não entra nesta conta, e as despesas do dia a dia gastam-no primeiro, até acabar. Só o resto sai daqui. As contas fixas e as poupanças saem sempre desta conta.</p>
     <p class="small muted" style="margin:0">${a.auto ? `Desde ${esc(dayShort(a.auto.d))} ${a.auto.d.slice(0, 4)} (${eur(a.auto.bal)} no início do dia): ${accFlowText(a)}, saldo agora <b>${eur(a.balance)}</b>. Se o saldo no banco for outro, escreva o saldo de hoje com a data de hoje.` : 'Com Sim, as despesas, contas fixas, poupanças e receitas que registar passam a sair desta conta ou a entrar nela, e o saldo atualiza-se sozinho. Para um saldo de outro dia (ex.: o início do mês), escolha esse dia: os movimentos registados desde então entram na conta.'}</p>
     <div class="row2"><button class="btn" type="submit">Guardar</button><button class="btn" type="button" data-act="acc-close">Cancelar</button></div>
     <button class="btn danger small" type="button" data-act="acc-del" data-id="${id}">${UI.confirmAcc === a.id ? 'Confirmar remover conta' : 'Remover conta'}</button>
@@ -1500,7 +1514,7 @@ app.addEventListener('submit', e => {
     const autoOn = g('auto') === '1', d = g('date') || today(), td = today();
     const st = accStart(a), keep = a.auto && d === st.d && bal === st.bal; // only bank/rate changed: keep the starting point
     if (autoOn && d > td) { toast('A data do saldo não pode ser depois de hoje.'); return; }
-    Object.assign(a, { bank: g('bank').trim() || a.bank, product: g('prod').trim(), balance: bal, tanb: tanb / 100, cap: g('cap'), irs: g('irs') === '1' });
+    Object.assign(a, { bank: g('bank').trim() || a.bank, product: g('prod').trim(), balance: bal, tanb: tanb / 100, cap: g('cap'), irs: g('irs') === '1', meal: g('meal') });
     if (!autoOn) delete a.auto;
     else if (keep) a.balance = autoBalance(a);
     else {
