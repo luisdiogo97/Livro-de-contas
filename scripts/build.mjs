@@ -47,4 +47,5 @@ body { margin: 0; overscroll-behavior-y: none; }
 <body>
 `;
 writeFileSync(`${out}/index.html`, head + page + '\n</body>\n</html>\n');
+copyFileSync('src/privacidade.html', `${out}/privacidade.html`);
 console.log('www/ built');
