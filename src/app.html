@@ -845,6 +845,10 @@ function viewMes() {
   const spentBy = {}; for (const x of items) if (SPEND.includes(catType(x.c))) spentBy[x.c] = (spentBy[x.c] || 0) + x.v;
   const spendRank = Object.entries(spentBy).sort((a, b) => b[1] - a[1]);
   const topSpend = spendRank[0] ? spendRank[0][1] : 1;
+  const incBy = {}; for (const x of items) if (catType(x.c) === 'Receita') incBy[x.c] = (incBy[x.c] || 0) + x.v;
+  const incRank = Object.entries(incBy).sort((a, b) => b[1] - a[1]);
+  const bigOut = items.filter(x => SPEND.includes(catType(x.c))).sort((a, b) => b.v - a.v)[0];
+  const catRow = (c, v, tot) => `<tr class="click" data-act="cat-open" data-v="${esc(c)}" aria-expanded="${UI.catOpen === c}"><td><span class="chev">${UI.catOpen === c ? '▾' : '▸'}</span> ${esc(c)}</td><td class="r">${eur(v)}</td><td class="r">${pct(tot ? v / tot : NaN)}</td></tr>${UI.catOpen === c ? `<tr class="sub"><td colspan="3"><div class="list">${items.filter(x => x.c === c).sort((a, b) => b.d.localeCompare(a.d)).map(x => rowTx(x)).join('')}</div></td></tr>` : ''}`;
   const byDay = {}; for (const x of items.slice().reverse()) (byDay[x.d] = byDay[x.d] || []).push(x);
   const days = Object.keys(byDay).sort().reverse();
   return `
@@ -862,6 +866,11 @@ function viewMes() {
       <tbody>${spendRank.map(([c, v]) => `<tr class="click" data-act="cat-open" data-v="${esc(c)}" aria-expanded="${UI.catOpen === c}"><td><span class="chev">${UI.catOpen === c ? '▾' : '▸'}</span> ${esc(c)}${catType(c) === 'Despesa' ? '' : ` <span class="muted small">${esc(catType(c).toLowerCase())}</span>`}<div class="bar" style="width:${(v / topSpend * 100).toFixed(1)}%"></div></td><td class="r">${eur(v)}</td><td class="r">${pct(t.gastos ? v / t.gastos : NaN)}</td></tr>${UI.catOpen === c ? `<tr class="sub"><td colspan="3"><div class="list">${items.filter(x => x.c === c).sort((a, b) => b.d.localeCompare(a.d)).map(x => rowTx(x)).join('')}</div></td></tr>` : ''}`).join('') || '<tr><td colspan="3" class="muted">Sem gastos neste mês.</td></tr>'}</tbody>
       ${spendRank.length ? `<tfoot><tr><td><b>Total</b></td><td class="r"><b>${eur(t.gastos)}</b></td><td class="r"><b>100%</b></td></tr></tfoot>` : ''}
     </table></div></section>
+    <section class="card"><h2>Receitas por origem</h2><div class="tbl-wrap"><table>
+      <thead><tr><th>Origem</th><th class="r">Valor</th><th class="r">% das receitas</th></tr></thead>
+      <tbody>${incRank.map(([c, v]) => catRow(c, v, t.Receita)).join('') || '<tr><td colspan="3" class="muted">Sem receitas neste mês.</td></tr>'}</tbody>
+      ${incRank.length > 1 ? `<tfoot><tr><td><b>Total</b></td><td class="r"><b>${eur(t.Receita)}</b></td><td class="r"><b>100%</b></td></tr></tfoot>` : ''}
+    </table></div>${bigOut ? `<p class="small muted" style="margin:10px 0 0">Maior despesa: <b>${eur(bigOut.v)}</b> em ${esc(bigOut.c)}, ${esc(dayShort(bigOut.d))}${bigOut.n ? ` (${esc(bigOut.n)})` : ''}.</p>` : ''}</section>
     <div class="grid2">
       <section class="card"><h2>Orçamento: despesas variáveis</h2>${budRows('Despesa')}</section>
       <section class="card"><h2>Orçamento: contas fixas</h2>${budRows('Conta fixa')}</section>
