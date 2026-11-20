@@ -1252,7 +1252,6 @@ function viewAjustes() {
       ${syncCard()}
       ${backupCard()}
     </div>
-    ${host.kind === 'app' ? '<p class="small muted" data-act="sh-secret" style="text-align:center;margin:18px 0 4px;user-select:none;-webkit-user-select:none;cursor:default">Livro de Contas</p>' : ''}
   </div>`;
 }
 
@@ -1588,13 +1587,13 @@ app.addEventListener('submit', e => {
     S.cats.push({ name, type, budget: 0, nature: SPEND.includes(type) ? 'Necessidade' : '' }); UI.addCatType = type; saveCats(); render(); toast(`Categoria criada: ${name}`);
   }
 });
-// ---------- shared expenses with one other person (src/shared.js). Hidden unless switched on ----------
-// Switched on per person with 5 taps on "Livro de Contas" at the bottom of Ajustes. The list lives in
-// Firestore and only the two Google accounts allowed by its rules can read it; the rest of the app is untouched.
+// ---------- shared expenses with one other person (src/shared.js), like Splitwise ----------
+// One person creates a group and sends the invitation code; the other joins with it. The list lives in
+// Firestore and only the group's two members can read it; the rest of the app stays on each person's devices.
 let SH = null, shSig = '';
-const SHF = { amount: '', desc: '', cat: '', payer: 'me', split: 'half', pct: '', date: today(), editing: null, confirmDel: false, settle: false, settleV: '', imp: null, more: false };
+const SHF = { joinCode: '', confirmLeave: false, amount: '', desc: '', cat: '', payer: 'me', split: 'half', pct: '', date: today(), editing: null, confirmDel: false, settle: false, settleV: '', imp: null, more: false };
 const shApi = () => window.LDC && window.LDC.shared;
-const shOn = () => host.kind === 'app' && !!shApi() && !!(S.settings.shared && S.settings.shared.on);
+const shOn = () => host.kind === 'app' && !!shApi();
 const shMe = () => (SH && SH.email) || '';
 const shOther = () => (SH && SH.members || []).find(m => m.email !== shMe()) || null;
 const shNameOf = e => e === shMe() ? 'Eu' : ((SH && SH.members || []).find(m => m.email === e) || {}).name || (e || '').split('@')[0];
@@ -1616,7 +1615,9 @@ function shCat(name) {
 // added, changed or removed to follow the shared list. Settlements and imported history are left out.
 function shReconcile() {
   if (!shOn() || !SH || !shMe() || !S.loaded.tx || !S.loaded.categories) return;
-  const cfg = S.settings.shared; if (cfg.mine === false) return;
+  if (!SH.group || SH.members.length < 2) return;
+  const cfg = S.settings.shared || {}; if (cfg.mine === false) return;
+  if (!cfg.from || cfg.gid !== SH.group.id) { S.settings.shared = { ...cfg, gid: SH.group.id, from: cfg.gid === SH.group.id && cfg.from ? cfg.from : today() }; saveSettings(); return shReconcile(); }
   const me = shMe(), from = cfg.from || '0000-00-00', want = {};
   for (const x of shLive()) {
     if (x.k === 'acerto' || x.imp || x.d < from) continue;
@@ -1682,14 +1683,26 @@ function viewPartilhado() {
   const head = `<header class="top"><h1>Partilhado</h1>${shOther() ? `<span class="sub">com ${esc(shOther().name)}</span>` : ''}</header>`;
   const card = (h, body) => `<section class="card stack"><h2>${h}</h2>${body}</section>`;
   if (!SH || !SH.configured) return head + card('Despesas partilhadas', '<p class="small muted">Ainda não está disponível nesta versão da app.</p>');
-  if (!shMe()) return head + card('Despesas partilhadas', `<p class="small">Entre com a sua conta Google para ver e registar as despesas que partilha.</p>
+  if (!shMe()) return head + card('Despesas partilhadas', `<p class="small">Para dividir despesas com outra pessoa (casal, colega de casa...), como no Splitwise. Os dois registam o que pagam, a app faz as contas e mostra quem deve a quem. A sua parte de cada despesa entra no seu Livro de Contas.</p>
+    <p class="small muted">Entre com a conta Google para criar um grupo ou entrar no de outra pessoa. Só esta lista fica partilhada; o resto da app continua só seu.</p>
     ${SH.error ? `<p class="small"><b>${esc(SH.error)}</b></p>` : ''}<button class="btn primary" data-act="sh-login">Entrar com a conta Google</button>`);
+  if (SH.status === 'loading' && !SH.group) return head + card('Despesas partilhadas', '<p class="small muted">A procurar o seu grupo…</p>');
+  if (!SH.group) return head + `<div class="grid2">
+    ${card('Criar um grupo', `<p class="small">Cria o grupo e envia o código de convite à outra pessoa.</p>
+      <button class="btn primary" data-act="sh-create">Criar grupo</button>`)}
+    <form class="card stack" id="sh-join" autocomplete="off"><h2>Tenho um código</h2>
+      <div class="field"><label class="small" for="sh-code">Código de convite</label><input id="sh-code" class="inp" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" value="${esc(SHF.joinCode)}" style="font-family:ui-monospace,monospace;letter-spacing:.06em"></div>
+      ${SH.error ? `<p class="small"><b>${esc(SH.error)}</b></p>` : ''}
+      <button class="btn" type="submit">Entrar no grupo</button></form></div>
+    <p class="small muted" style="margin-top:12px">Entrou como ${esc(shMe())}. <button class="btn ghost small" data-act="sh-logout">Usar outra conta</button></p>`;
   const banner = SH.status === 'login' ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>A sessão expirou.</span><button class="btn small" data-act="sh-login">Entrar</button></div>`
-    : SH.status === 'denied' ? `<div class="banner">A conta <b>${esc(shMe())}</b> não tem acesso a este grupo. <button class="btn small" data-act="sh-logout">Sair e usar outra conta</button></div>`
+    : SH.status === 'denied' ? `<div class="banner">Sem acesso a este grupo com a conta <b>${esc(shMe())}</b>. <button class="btn small" data-act="sh-logout">Sair e usar outra conta</button></div>`
     : SH.status === 'error' ? `<div class="banner">${esc(SH.error)}</div>` : '';
   const o = shOther();
-  if (!o) return head + banner + card('Falta a outra pessoa', `<p class="small">Já entrou como <b>${esc(shMe())}</b>. Agora a outra pessoa tem de fazer o mesmo na app dela: em Ajustes, tocar 5 vezes em "Livro de Contas" no fundo da página, abrir Partilhado e entrar com a conta Google.</p>
-    <button class="btn" data-act="sh-refresh">Verificar outra vez</button>`);
+  if (!o) return head + banner + card('Convide a outra pessoa', `<p class="small">Envie este código à pessoa com quem vai partilhar despesas. Na app dela: <b>Partilhado</b> → entrar com a conta Google → <b>Tenho um código</b>.</p>
+    <div style="font-family:ui-monospace,monospace;font-size:1.35rem;font-weight:700;letter-spacing:.08em;text-align:center;padding:12px;border:1.5px dashed var(--line);border-radius:12px;user-select:all">${esc(SH.group.invite)}</div>
+    <div class="row2"><button class="btn primary" data-act="sh-share">Enviar o código</button><button class="btn" data-act="sh-refresh">Verificar outra vez</button></div>
+    <button class="btn ghost small" data-act="sh-leave">${SHF.confirmLeave ? 'Confirmar: apagar este grupo' : 'Cancelar o grupo'}</button>`);
   const bal = shBalance(), absB = Math.abs(bal);
   const list = shLive().slice().sort((a, b) => b.d.localeCompare(a.d) || (b.at || 0) - (a.at || 0));
   const shown = SHF.more ? list : list.slice(0, 40), by = {};
@@ -1713,7 +1726,8 @@ function viewPartilhado() {
       <p class="small muted" style="margin:0">Cada despesa partilhada põe a sua parte no seu Livro de Contas, na categoria escolhida (se não a tiver, vai para a categoria abaixo). Os acertos de contas não entram.</p>
       <div class="field"><label class="small" for="sh-defcat">Categoria quando a de ${esc(o.name)} não existir aqui</label><select id="sh-defcat" class="inp">${S.cats.filter(c => c.type === 'Despesa' || c.type === 'Conta fixa').map(c => `<option ${shCat('') === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
       ${shImportBox()}
-      <p class="small muted" style="margin:0">Entrou como ${esc(shMe())}.</p><button class="btn small" data-act="sh-logout">Sair desta conta</button>
+      <p class="small muted" style="margin:0">Entrou como ${esc(shMe())}. Código do grupo: <span style="font-family:ui-monospace,monospace;user-select:all">${esc(SH.group.invite)}</span></p>
+      <div class="row2"><button class="btn small" data-act="sh-logout">Sair desta conta</button><button class="btn danger small" data-act="sh-leave">${SHF.confirmLeave ? 'Confirmar sair do grupo' : 'Sair do grupo'}</button></div>
     </section></div></div>`;
 }
 function shHomeCard() {
@@ -1774,22 +1788,18 @@ function shImpWho(i) {
   Object.assign(im, { who: true, items, from: ds[0], to: ds[ds.length - 1], bal, dup: items.filter(x => have.has(x.id)).length });
   render();
 }
-let shTaps = [];
 app.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, v = b.dataset.v, api = shApi();
-  if (act === 'sh-secret') {
-    const now = Date.now(); shTaps = shTaps.filter(t => now - t < 3000).concat([now]);
-    if (shTaps.length < 5 || !api) return; shTaps = [];
-    const on = !(S.settings.shared && S.settings.shared.on);
-    S.settings.shared = { ...(S.settings.shared || {}), on, from: (S.settings.shared && S.settings.shared.from) || today() };
-    saveSettings();
-    if (on) { api.start(); toast('Separador Partilhado ativado'); go('partilhado'); } else { toast('Separador Partilhado escondido'); render(); }
-    return;
-  }
   if (!act.startsWith('sh-') || !api) return;
   if (act === 'sh-login') api.signIn((S.settings.name || '').trim());
   else if (act === 'sh-logout') { api.signOut(); shResetForm(); }
+  else if (act === 'sh-create') { b.disabled = true; api.createGroup('', (S.settings.name || '').trim()).then(ok => { if (ok) toast('Grupo criado. Envie o código à outra pessoa.'); }); }
+  else if (act === 'sh-share') { api.shareInvite().then(r => { if (r === 'copied') toast('Código copiado'); }).catch(() => {}); }
+  else if (act === 'sh-leave') {
+    if (!SHF.confirmLeave) { SHF.confirmLeave = true; render(); return; }
+    SHF.confirmLeave = false; api.leaveGroup(); toast('Saiu do grupo. As despesas que já estavam no seu livro ficam lá.');
+  }
   else if (act === 'sh-refresh') api.refresh();
   else if (act === 'sh-payer') { SHF.payer = v; render(); }
   else if (act === 'sh-split') { SHF.split = v; render(); if (v === 'pct') { const el = document.getElementById('sh-pct'); if (el) el.focus(); } }
@@ -1819,6 +1829,7 @@ app.addEventListener('input', e => {
     if (btn) { btn.disabled = !(shs && SHF.cat); if (!SHF.editing) btn.textContent = 'Guardar' + (v > 0 ? ' ' + eur(v) : ''); }
   }
   else if (id === 'sh-desc') SHF.desc = e.target.value;
+  else if (id === 'sh-code') SHF.joinCode = e.target.value;
   else if (id === 'sh-settle-v') SHF.settleV = e.target.value;
 });
 app.addEventListener('change', e => {
@@ -1829,6 +1840,7 @@ app.addEventListener('change', e => {
 });
 app.addEventListener('submit', e => {
   const f = e.target, api = shApi(); if (!api || !f.id.startsWith('sh-')) return;
+  if (f.id === 'sh-join') { const btn = f.querySelector('button[type=submit]'); if (btn) btn.disabled = true; api.joinGroup(SHF.joinCode, (S.settings.name || '').trim()).then(ok => { if (ok) { SHF.joinCode = ''; toast('Entrou no grupo'); } else render(); }); return; }
   const me = shMe(), o = shOther(); if (!o) return;
   if (f.id === 'sh-entry') {
     const v = parseAmount(SHF.amount), shs = v > 0 ? shShares(v) : null;
@@ -2317,7 +2329,7 @@ renderTabs();
       if (!was || was.status !== i.status || was.on !== i.on || was.lastSync !== i.lastSync) render();
     });
     if (db && window.LDC.shared) window.LDC.shared.onChange(i => {
-      SH = i; const sig = JSON.stringify([i.status, i.email, i.items, i.members, i.pending, i.error]);
+      SH = i; const sig = JSON.stringify([i.status, i.email, i.group, i.items, i.members, i.pending, i.error]);
       if (sig === shSig) return; shSig = sig; shReconcile(); render();
     });
   } else {

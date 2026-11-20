@@ -1,0 +1,28 @@
+rules_version = '2';
+// Rules for the shared expenses (Partilhado). Paste in the Firebase console:
+// Firestore > Rules. Anyone signed in with Google can create a group of two; only the
+// members can read or write it, and joining needs the group's secret code.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email is string; }
+    function me() { return request.auth.token.email; }
+    function member(g) { return me() in get(/databases/$(db)/documents/grupos/$(g)).data.members; }
+
+    match /grupos/{g} {
+      allow read: if signedIn() && me() in resource.data.members;
+      allow create: if signedIn() && request.resource.data.members == [me()]
+        && request.resource.data.code is string && request.resource.data.code.size() == 6;
+      allow update: if signedIn() && request.resource.data.code == resource.data.code && (
+        (me() in resource.data.members && request.resource.data.members.size() <= 2)
+        || (request.resource.data.get('joinCode', '') == resource.data.code
+            && request.resource.data.members.hasAll(resource.data.members)
+            && request.resource.data.members.size() == resource.data.members.size() + 1
+            && me() in request.resource.data.members
+            && request.resource.data.members.size() <= 2));
+
+      match /{col}/{doc} {
+        allow read, write: if signedIn() && member(g);
+      }
+    }
+  }
+}
