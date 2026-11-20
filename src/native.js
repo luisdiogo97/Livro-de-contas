@@ -81,6 +81,12 @@ const sync = createSync({
 // Shared expenses (only for people allowed by the Firestore rules); started by the page when switched on.
 const shared = createShared({
   native: Capacitor.isNativePlatform(),
+  // The invitation code: Android share sheet (WhatsApp, SMS...); in a browser, copied.
+  shareText: async (text) => {
+    if (Capacitor.isNativePlatform()) { await Share.share({ text, dialogTitle: 'Enviar o convite' }); return 'shared'; }
+    if (navigator.share) { try { await navigator.share({ text }); return 'shared'; } catch (e) { /* cancelled */ } }
+    try { await navigator.clipboard.writeText(text); return 'copied'; } catch (e) { return 'none'; }
+  },
   store: {
     get: async (key) => (await Preferences.get({ key })).value,
     set: (key, value) => Preferences.set({ key, value }),
