@@ -61,6 +61,10 @@ export function createShared({ native, store }) {
   let auth = null;            // { refresh, email }
   let idToken = null, idUntil = 0;
   let items = [], members = [], at = null, queue = [];
+  // Reads are counted per document, so after one full read only what changed since is fetched
+  // (each write stamps the server time in field t). Members are re-read only every 10 minutes.
+  let since = null, membersAt = 0;
+  const root = `projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
   let status = 'off';         // off | idle | loading | login | denied | error | unconfigured
   let lastError = '';
   let busy = null, timer = null, started = false;
@@ -106,10 +110,31 @@ export function createShared({ native, store }) {
     return out;
   }
 
+  async function api(url, body) {
+    const t = await firebaseToken();
+    const res = await fetch('https://firestore.googleapis.com/v1/' + url, { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (res.status === 401) { idToken = null; throw loginErr(); }
+    if (res.status === 403) throw Object.assign(new Error('denied'), { code: 'denied' });
+    if (!res.ok) throw new Error('Firestore ' + res.status);
+    return res.json();
+  }
+  const commit = (w) => api(`${root}:commit`, { writes: [{
+    update: { name: `${root}/grupos/${GROUP}/${w.col}/${w.id}`, ...enc(w.data) },
+    updateTransforms: [{ fieldPath: 't', setToServerValue: 'REQUEST_TIME' }],
+  }] });
+  async function changedSince(col, ts) {
+    const rows = await api(`${root}/grupos/${GROUP}:runQuery`, { structuredQuery: {
+      from: [{ collectionId: col }],
+      where: { fieldFilter: { field: { fieldPath: 't' }, op: 'GREATER_THAN_OR_EQUAL', value: { timestampValue: ts } } },
+    } });
+    const out = []; let readTime = null;
+    for (const r of rows || []) { if (r.readTime) readTime = r.readTime; if (r.document) { const v = dec(r.document); if (v) out.push(v); } }
+    return { out, readTime };
+  }
   async function flush() {
     while (queue.length) {
       const w = queue[0];
-      await fs(`/${w.col}/${encodeURIComponent(w.id)}`, { method: 'PATCH', body: JSON.stringify(enc(w.data)) });
+      await commit(w);
       queue.shift(); await saveQueue();
     }
   }
@@ -126,8 +151,17 @@ export function createShared({ native, store }) {
       if (status !== 'idle') setStatus('loading');
       try {
         await flush();
-        const [mv, mb] = await Promise.all([listAll('mov'), listAll('membros')]);
-        items = mv; members = mb; at = new Date().toISOString();
+        if (!since) {
+          const started = new Date(Date.now() - 5 * 60000).toISOString();
+          items = await listAll('mov'); since = started;
+        } else {
+          const { out, readTime } = await changedSince('mov', since);
+          const byId = new Map(items.map((x) => [x.id, x])); for (const x of out) byId.set(x.id, x); items = [...byId.values()];
+          // a little overlap, so a write that lands at the same moment is never missed
+          if (readTime) since = new Date(Date.parse(readTime) - 60000).toISOString();
+        }
+        if (Date.now() - membersAt > 10 * 60000 || members.length < 2) { members = await listAll('membros'); membersAt = Date.now(); }
+        at = new Date().toISOString();
         for (const w of queue) apply(w);
         await saveCache();
         setStatus('idle');
@@ -188,7 +222,7 @@ export function createShared({ native, store }) {
       }
     },
     async signOut() {
-      auth = null; idToken = null; items = []; members = []; queue = [];
+      auth = null; idToken = null; items = []; members = []; queue = []; since = null; membersAt = 0;
       await store.remove(KEY_AUTH); await store.remove(KEY_CACHE); await store.remove(KEY_QUEUE);
       clearInterval(timer); setStatus('off');
     },

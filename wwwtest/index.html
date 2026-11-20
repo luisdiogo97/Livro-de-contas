@@ -1795,7 +1795,7 @@ app.addEventListener('click', e => {
   else if (act === 'sh-split') { SHF.split = v; render(); if (v === 'pct') { const el = document.getElementById('sh-pct'); if (el) el.focus(); } }
   else if (act === 'sh-cat') { SHF.cat = SHF.cat === v ? '' : v; render(); }
   else if (act === 'sh-more') { SHF.more = true; render(); }
-  else if (act === 'sh-edit') { const x = (SH && SH.items || []).find(i => i.id === v); if (!x) { toast('Esta despesa partilhada já não existe.'); return; } if (x.k === 'acerto') { shResetForm(); SHF.editing = null; SHF.settle = false; } shLoad(x); if (view !== 'partilhado') go('partilhado'); else { render(); window.scrollTo(0, 0); } if (x.k === 'acerto') { SHF.split = 'theirs'; } }
+  else if (act === 'sh-edit') { const x = (SH && SH.items || []).find(i => i.id === v); if (!x) { toast('Esta despesa partilhada já não existe.'); return; } if (x.k === 'acerto') { toast(`Acerto de ${eur(x.v)} de ${dayShort(x.d)}`, { label: 'Apagar', fn: () => api.put({ ...x, del: true, at: Date.now(), by: shMe() }) }); return; } shLoad(x); if (view !== 'partilhado') go('partilhado'); else { render(); window.scrollTo(0, 0); } }
   else if (act === 'sh-cancel') { shResetForm(); render(); }
   else if (act === 'sh-del') {
     if (!SHF.confirmDel) { SHF.confirmDel = true; render(); return; }
