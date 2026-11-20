@@ -64,7 +64,7 @@ h2 { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; mar
 /* tab bar */
 nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
-nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
+nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
 nav.tabs button { background: none; border: 0; padding: 9px 2px 10px; display: grid; justify-items: center; gap: 3px; color: var(--muted); font-size: 0.7rem; font-weight: 600; cursor: pointer; }
 nav.tabs button svg { width: 22px; height: 22px; }
 nav.tabs button[aria-current="page"] { color: var(--accent); }
@@ -706,6 +706,7 @@ function viewInicio() {
   <div class="home"><div class="stack">
     ${syncBanner()}
     ${!allTx().length ? welcomeCard() : reviewCard()}
+    ${shHomeCard()}
     <section class="home-hero">
       <div class="lbl"><span>Gastos de ${esc(mName)}</span><span>${left ? `faltam ${left} dia${left > 1 ? 's' : ''}` : 'último dia'}</span></div>
       <div><div class="big">${eur(spent)}</div>
@@ -813,7 +814,7 @@ function viewRegistar() {
 }
 function rowTx(x, showDate = true) {
   const tp = catType(x.c), inflow = tp === 'Receita';
-  return `<button class="row" data-act="edit" data-id="${esc(x.id)}" aria-label="Editar ${esc(x.c)} ${eur(x.v)}">
+  return `<button class="row" ${x.sh ? `data-act="sh-edit" data-v="${esc(x.sh)}"` : `data-act="edit" data-id="${esc(x.id)}"`} aria-label="Editar ${esc(x.c)} ${eur(x.v)}">
     <span class="t">${esc(x.c)}</span><span class="v ${inflow ? 'in' : ''}">${inflow ? '+' : '−'}${eur(x.v)}</span>
     <span class="d">${showDate ? esc(dayShort(x.d)) + ' · ' : ''}${esc(tp)}${x.lk && x.lk.e ? ' · ' + esc(x.lk.e) : ''}${x.lk && x.lk.a && x.m ? ' · de ' + esc(x.m) : ''}${x.n ? ' · ' + esc(x.n) : ''}</span><span></span></button>`;
 }
@@ -1234,6 +1235,7 @@ function viewAjustes() {
       ${syncCard()}
       ${backupCard()}
     </div>
+    ${host.kind === 'app' ? '<p class="small muted" data-act="sh-secret" style="text-align:center;margin:18px 0 4px;user-select:none;-webkit-user-select:none;cursor:default">Livro de Contas</p>' : ''}
   </div>`;
 }
 
@@ -1356,20 +1358,23 @@ const ICONS = {
   ano: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20v-9M20 20V4"/></svg>',
   patrimonio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/></svg>',
   procurar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>',
+  partilhado: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 19c.6-3 2.8-5 5.5-5s4.9 2 5.5 5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2.2 0 3.8 1.6 4.3 4.5"/></svg>',
   ajustes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
 };
 const TABS = [['inicio', 'Início'], ['registar', 'Registar'], ['mes', 'Mês'], ['ano', 'Ano'], ['patrimonio', 'Património']];
 function renderTabs() {
   // On a computer screen the bar becomes a side menu, with the app name on top and Ajustes at the bottom.
   const btn = ([k, l], cls) => `<button type="button" data-tab="${k}" ${cls ? `class="${cls}"` : ''} ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`;
-  document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + TABS.map(t => btn(t)).join('') + btn(['procurar', 'Procurar'], 'desk') + btn(['ajustes', 'Ajustes'], 'desk');
+  document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + (shOn() ? [...TABS, ['partilhado', 'Partilhado']] : TABS).map(t => btn(t)).join('') + btn(['procurar', 'Procurar'], 'desk') + btn(['ajustes', 'Ajustes'], 'desk');
 }
 function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
   refreshMain();
+  if (shOn()) shApi().start();
+  if (view === 'partilhado' && !shOn() && S.loaded.settings) view = 'inicio';
   const a = document.activeElement, aid = a && a.id, sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
   const html = (S.dbState === 'off' ? '<div class="banner">' + offMsg() + '</div>' : '') +
-    ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes, procurar: viewProcurar }[view] || viewInicio)();
+    ({ inicio: viewInicio, registar: viewRegistar, mes: viewMes, ano: viewAno, patrimonio: viewPatrimonio, ajustes: viewAjustes, procurar: viewProcurar, partilhado: viewPartilhado }[view] || viewInicio)();
   document.getElementById('app').innerHTML = html;
   renderTabs();
   fitCharts();
@@ -1566,6 +1571,266 @@ app.addEventListener('submit', e => {
     S.cats.push({ name, type, budget: 0, nature: SPEND.includes(type) ? 'Necessidade' : '' }); UI.addCatType = type; saveCats(); render(); toast(`Categoria criada: ${name}`);
   }
 });
+// ---------- shared expenses with one other person (src/shared.js). Hidden unless switched on ----------
+// Switched on per person with 5 taps on "Livro de Contas" at the bottom of Ajustes. The list lives in
+// Firestore and only the two Google accounts allowed by its rules can read it; the rest of the app is untouched.
+let SH = null, shSig = '';
+const SHF = { amount: '', desc: '', cat: '', payer: 'me', split: 'half', pct: '', date: today(), editing: null, confirmDel: false, settle: false, settleV: '', imp: null, more: false };
+const shApi = () => window.LDC && window.LDC.shared;
+const shOn = () => host.kind === 'app' && !!shApi() && !!(S.settings.shared && S.settings.shared.on);
+const shMe = () => (SH && SH.email) || '';
+const shOther = () => (SH && SH.members || []).find(m => m.email !== shMe()) || null;
+const shNameOf = e => e === shMe() ? 'Eu' : ((SH && SH.members || []).find(m => m.email === e) || {}).name || (e || '').split('@')[0];
+const shLive = () => (SH && SH.items || []).filter(x => !x.del);
+const r2 = v => Math.round(v * 100) / 100;
+function shBalance() { // > 0: the other person owes me
+  const me = shMe(); let net = 0;
+  for (const x of shLive()) { if (x.pb === me) net += +x.v || 0; net -= +((x.sh || {})[me]) || 0; }
+  return r2(net);
+}
+function shCat(name) {
+  const ok = c => c && (c.type === 'Despesa' || c.type === 'Conta fixa');
+  const own = S.cats.find(c => c.name === name); if (ok(own)) return own.name;
+  const def = S.cats.find(c => c.name === (S.settings.shared || {}).cat); if (ok(def)) return def.name;
+  const outros = S.cats.find(c => c.type === 'Despesa' && /^outr/i.test(c.name)); if (outros) return outros.name;
+  return (S.cats.find(c => c.type === 'Despesa') || { name: name || 'Outros' }).name;
+}
+// My share of each shared expense goes into my own book as a normal entry (id sh-<shared id>),
+// added, changed or removed to follow the shared list. Settlements and imported history are left out.
+function shReconcile() {
+  if (!shOn() || !SH || !shMe() || !S.loaded.tx || !S.loaded.categories) return;
+  const cfg = S.settings.shared; if (cfg.mine === false) return;
+  const me = shMe(), from = cfg.from || '0000-00-00', want = {};
+  for (const x of shLive()) {
+    if (x.k === 'acerto' || x.imp || x.d < from) continue;
+    const v = r2(+((x.sh || {})[me]) || 0); if (!(v > 0)) continue;
+    const it = { id: 'sh-' + x.id, d: x.d, v, c: shCat(x.c), n: (x.desc ? x.desc + ' · ' : '') + 'partilhado', m: '', sh: x.id };
+    (want[monthKey(x.d)] = want[monthKey(x.d)] || []).push(it);
+  }
+  for (const k of new Set([...Object.keys(S.months), ...Object.keys(want)])) {
+    const cur = S.months[k] || [], mine = cur.filter(t => t.sh), keep = cur.filter(t => !t.sh);
+    const next = (want[k] || []).map(w => { const o = mine.find(t => t.id === w.id); return o && o.c !== w.c && S.cats.some(c => c.name === o.c) && o.v === w.v && o.d === w.d ? { ...w, c: o.c } : w; });
+    const sig = a => JSON.stringify(a.slice().sort((a, b) => a.id.localeCompare(b.id)));
+    if (sig(mine) !== sig(next)) { S.months[k] = keep.concat(next); saveMonth(k); }
+  }
+}
+function shShares(v) {
+  const me = shMe(), o = shOther(); if (!o) return null;
+  const sp = SHF.split, mineV = sp === 'half' ? r2(v / 2) : sp === 'mine' ? v : sp === 'theirs' ? 0 : r2(v * (parseAmount(SHF.pct) / 100));
+  if (!(mineV >= 0) || mineV > v) return null;
+  return { [me]: mineV, [o.email]: r2(v - mineV) };
+}
+function shForm() {
+  const o = shOther(), v = parseAmount(SHF.amount), shs = v > 0 ? shShares(v) : null;
+  const cats = S.cats.filter(c => c.type === 'Despesa' || c.type === 'Conta fixa');
+  const ok = v > 0 && shs && SHF.cat;
+  const chip = (act, val, cur, label) => `<button type="button" class="chip" data-act="${act}" data-v="${esc(val)}" aria-pressed="${cur === val}">${esc(label)}</button>`;
+  return `<form class="card stack" id="sh-entry" autocomplete="off">
+    <div class="cardhead"><h2>${SHF.editing ? 'Editar despesa partilhada' : 'Nova despesa partilhada'}</h2>${SHF.editing ? '<button type="button" class="btn ghost small" data-act="sh-cancel">Cancelar</button>' : ''}</div>
+    <label class="amount"><input id="sh-amount" inputmode="decimal" placeholder="0,00" value="${esc(SHF.amount)}" aria-label="Valor total em euros"><span>€</span></label>
+    <div class="field"><label class="small" for="sh-desc">Descrição</label><input id="sh-desc" class="inp" maxlength="60" placeholder="ex.: Continente, jantar, renda" value="${esc(SHF.desc)}"></div>
+    <div class="field"><span class="label">Quem pagou</span><div class="seg" role="group" aria-label="Quem pagou">
+      <button type="button" data-act="sh-payer" data-v="me" aria-pressed="${SHF.payer === 'me'}">Eu</button><button type="button" data-act="sh-payer" data-v="other" aria-pressed="${SHF.payer === 'other'}">${esc(o.name)}</button></div></div>
+    <div class="field"><span class="label">Como se divide</span><div class="chips" style="align-items:center">
+      ${chip('sh-split', 'half', SHF.split, 'A meias')}${chip('sh-split', 'mine', SHF.split, 'Só minha')}${chip('sh-split', 'theirs', SHF.split, 'Só de ' + o.name)}${chip('sh-split', 'pct', SHF.split, 'Outra %')}
+      ${SHF.split === 'pct' ? `<label style="display:flex;align-items:center;gap:5px"><span class="small muted">A minha parte</span><input id="sh-pct" class="inp" style="width:70px" inputmode="decimal" placeholder="ex.: 60" value="${esc(SHF.pct)}" aria-label="A minha parte em percentagem"><span>%</span></label>` : ''}</div>
+      <div class="small res" id="sh-res">${shs ? `A minha parte: <b>${eur(shs[shMe()])}</b> · ${esc(o.name)}: <b>${eur(shs[o.email])}</b>` : 'Escreva o valor total.'}</div></div>
+    <div class="field"><span class="label">Categoria</span><div class="chips">${cats.map(c => chip('sh-cat', c.name, SHF.cat, c.name)).join('')}</div></div>
+    <div class="field"><label class="small" for="sh-date">Data</label><input type="date" id="sh-date" class="inp" value="${esc(SHF.date)}"></div>
+    <button class="btn primary" type="submit" ${ok ? '' : 'disabled'}>${SHF.editing ? 'Guardar alterações' : 'Guardar' + (v > 0 ? ' ' + eur(v) : '')}</button>
+    ${SHF.editing ? `<button class="btn danger small" type="button" data-act="sh-del">${SHF.confirmDel ? 'Confirmar apagar' : 'Apagar'}</button>` : ''}
+  </form>`;
+}
+function shRow(x) {
+  const me = shMe(), mine = +((x.sh || {})[me]) || 0;
+  if (x.k === 'acerto') {
+    const to = Object.keys(x.sh || {})[0];
+    return `<button class="row" data-act="sh-edit" data-v="${esc(x.id)}"><span class="t">Acerto de contas</span><span class="v in">${eur(x.v)}</span>
+      <span class="d">${esc(dayShort(x.d))} · ${x.pb === me ? 'Pagaste a ' + esc(shNameOf(to)) : esc(shNameOf(x.pb)) + ' pagou-te'}</span><span></span></button>`;
+  }
+  return `<button class="row" data-act="sh-edit" data-v="${esc(x.id)}"><span class="t">${esc(x.desc || x.c || 'Despesa')}</span><span class="v">${eur(x.v)}</span>
+    <span class="d">${esc(dayShort(x.d))} · ${x.pb === me ? 'pagaste tu' : 'pagou ' + esc(shNameOf(x.pb))} · a tua parte ${eur(mine)}${x.c && x.desc ? ' · ' + esc(x.c) : ''}${x.imp ? ' · Splitwise' : ''}</span><span></span></button>`;
+}
+function shImportBox() {
+  const im = SHF.imp;
+  if (!im) return `<label class="btn" for="sh-csv" style="text-align:center">Importar do Splitwise (CSV)…</label><input type="file" id="sh-csv" accept=".csv,text/csv" hidden>
+    <p class="small muted" style="margin:0">No site do Splitwise, abra o grupo, toque na roda dentada e escolha <b>Export as spreadsheet</b>. O histórico entra só aqui, não no seu livro pessoal.</p>`;
+  if (!im.who) return `<div class="edit"><b>Qual destas pessoas é você?</b><div class="row2">${im.names.map((n, i) => `<button type="button" class="btn" data-act="sh-imp-who" data-v="${i}">${esc(n)}</button>`).join('')}</div>
+    <button type="button" class="btn ghost small" data-act="sh-imp-cancel">Cancelar</button></div>`;
+  return `<div class="edit"><b>Importar ${im.items.length} movimentos do Splitwise?</b>
+    <span class="small">${esc(dayShort(im.from))} ${im.from.slice(0, 4)} a ${esc(dayShort(im.to))} ${im.to.slice(0, 4)}. ${im.bal > 0 ? `No Splitwise, ${esc(shOther().name)} devia-te ${eur(im.bal)}.` : im.bal < 0 ? `No Splitwise, devias ${eur(-im.bal)} a ${esc(shOther().name)}.` : 'No Splitwise estavam quites.'}${im.dup ? ` ${im.dup} já estavam importados e ficam iguais.` : ''}</span>
+    <div class="row2"><button type="button" class="btn primary" data-act="sh-imp-ok">Importar</button><button type="button" class="btn" data-act="sh-imp-cancel">Cancelar</button></div></div>`;
+}
+function viewPartilhado() {
+  const head = `<header class="top"><h1>Partilhado</h1>${shOther() ? `<span class="sub">com ${esc(shOther().name)}</span>` : ''}</header>`;
+  const card = (h, body) => `<section class="card stack"><h2>${h}</h2>${body}</section>`;
+  if (!SH || !SH.configured) return head + card('Despesas partilhadas', '<p class="small muted">Ainda não está disponível nesta versão da app.</p>');
+  if (!shMe()) return head + card('Despesas partilhadas', `<p class="small">Entre com a sua conta Google para ver e registar as despesas que partilha.</p>
+    ${SH.error ? `<p class="small"><b>${esc(SH.error)}</b></p>` : ''}<button class="btn primary" data-act="sh-login">Entrar com a conta Google</button>`);
+  const banner = SH.status === 'login' ? `<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>A sessão expirou.</span><button class="btn small" data-act="sh-login">Entrar</button></div>`
+    : SH.status === 'denied' ? `<div class="banner">A conta <b>${esc(shMe())}</b> não tem acesso a este grupo. <button class="btn small" data-act="sh-logout">Sair e usar outra conta</button></div>`
+    : SH.status === 'error' ? `<div class="banner">${esc(SH.error)}</div>` : '';
+  const o = shOther();
+  if (!o) return head + banner + card('Falta a outra pessoa', `<p class="small">Já entrou como <b>${esc(shMe())}</b>. Agora a outra pessoa tem de fazer o mesmo na app dela: em Ajustes, tocar 5 vezes em "Livro de Contas" no fundo da página, abrir Partilhado e entrar com a conta Google.</p>
+    <button class="btn" data-act="sh-refresh">Verificar outra vez</button>`);
+  const bal = shBalance(), absB = Math.abs(bal);
+  const list = shLive().slice().sort((a, b) => b.d.localeCompare(a.d) || (b.at || 0) - (a.at || 0));
+  const shown = SHF.more ? list : list.slice(0, 40), by = {};
+  for (const x of shown) (by[monthKey(x.d)] = by[monthKey(x.d)] || []).push(x);
+  const settle = SHF.settle ? `<form class="edit" id="sh-settle" autocomplete="off"><b>${bal > 0 ? esc(o.name) + ' paga-te' : 'Pagas a ' + esc(o.name)}</b>
+      <label class="amount" style="font-size:1.4rem"><input id="sh-settle-v" inputmode="decimal" value="${esc(SHF.settleV)}" aria-label="Valor do acerto"><span>€</span></label>
+      <div class="row2"><button class="btn primary" type="submit">Registar acerto</button><button class="btn" type="button" data-act="sh-settle-cancel">Cancelar</button></div></form>` : '';
+  const cfg = S.settings.shared || {};
+  return head + banner + `<div class="grid2"><div class="stack">
+    <section class="card stack" style="gap:6px"><span class="small muted">Saldo</span>
+      <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:${bal > 0 ? 'var(--good)' : bal < 0 ? 'var(--bad)' : 'inherit'}">${absB < 0.005 ? 'Estão quites' : bal > 0 ? `${esc(o.name)} deve-te ${eur(absB)}` : `Deves ${eur(absB)} a ${esc(o.name)}`}</div>
+      <span class="small muted">${SH.status === 'loading' ? 'A atualizar…' : SH.lastSync ? 'Atualizado ' + syncWhen(SH.lastSync) : ''}${SH.pending ? ` · ${SH.pending} por enviar` : ''}</span>
+      ${absB >= 0.005 && !SHF.settle ? '<button class="btn" data-act="sh-settle">Acertar contas</button>' : ''}${settle}</section>
+    ${shForm()}
+  </div><div class="stack">
+    <section class="card"><div class="cardhead"><h2>Movimentos</h2><button class="btn ghost small" data-act="sh-refresh">Atualizar</button></div>
+      ${Object.keys(by).sort().reverse().map(k => `<div class="dayhead" style="text-transform:none">${esc(monthLong(k).replace(/^./, c => c.toUpperCase()))}</div>${by[k].map(shRow).join('')}`).join('') || '<p class="empty">Ainda sem despesas partilhadas.</p>'}
+      ${list.length > shown.length ? '<button class="btn small" data-act="sh-more">Ver tudo</button>' : ''}</section>
+    <section class="card stack"><h2>Opções</h2>
+      <button type="button" class="chip" data-act="sh-mine" aria-pressed="${cfg.mine !== false}">A minha parte entra no meu livro</button>
+      <p class="small muted" style="margin:0">Cada despesa partilhada põe a sua parte no seu Livro de Contas, na categoria escolhida (se não a tiver, vai para a categoria abaixo). Os acertos de contas não entram.</p>
+      <div class="field"><label class="small" for="sh-defcat">Categoria quando a de ${esc(o.name)} não existir aqui</label><select id="sh-defcat" class="inp">${S.cats.filter(c => c.type === 'Despesa' || c.type === 'Conta fixa').map(c => `<option ${shCat('') === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+      ${shImportBox()}
+      <p class="small muted" style="margin:0">Entrou como ${esc(shMe())}.</p><button class="btn small" data-act="sh-logout">Sair desta conta</button>
+    </section></div></div>`;
+}
+function shHomeCard() {
+  if (!shOn() || !shMe() || !shOther()) return '';
+  const bal = shBalance(), o = shOther();
+  return `<button class="card row" data-act="goto" data-v="partilhado" style="text-align:left;width:100%"><span class="t">Partilhado com ${esc(o.name)}</span>
+    <span class="v ${bal > 0 ? 'in' : ''}">${Math.abs(bal) < 0.005 ? 'quites' : eur(Math.abs(bal))}</span><span class="d">${Math.abs(bal) < 0.005 ? 'Estão quites' : bal > 0 ? esc(o.name) + ' deve-te' : 'Deves a ' + esc(o.name)}</span><span></span></button>`;
+}
+function shResetForm() { Object.assign(SHF, { amount: '', desc: '', cat: '', payer: 'me', split: 'half', pct: '', date: today(), editing: null, confirmDel: false }); }
+function shLoad(x) {
+  const me = shMe(), mine = +((x.sh || {})[me]) || 0, v = +x.v;
+  const split = Math.abs(mine - r2(v / 2)) < 0.011 ? 'half' : mine === v ? 'mine' : mine === 0 ? 'theirs' : 'pct';
+  Object.assign(SHF, { editing: x.id, amount: String(v).replace('.', ','), desc: x.desc || '', cat: x.c || '', payer: x.pb === me ? 'me' : 'other', split, pct: split === 'pct' ? String(r2(mine / v * 100)).replace('.', ',') : '', date: x.d, confirmDel: false });
+}
+// Splitwise "Export as spreadsheet": Date,Description,Category,Cost,Currency,<person 1>,<person 2>, where each person
+// column is what they are up (+) or down (−) on that line. Payments have the category "Payment".
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function shReadCsv(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const rows = parseCsv(String(r.result).replace(/^﻿/, ''));
+      const h = rows[0].map(s => s.trim()), iD = h.indexOf('Date'), iDesc = h.indexOf('Description'), iCat = h.indexOf('Category'), iCost = h.indexOf('Cost'), iCur = h.indexOf('Currency');
+      if (iD < 0 || iCost < 0 || h.length < iCur + 3) throw 0;
+      const names = h.slice(iCur + 1, iCur + 3);
+      const lines = rows.slice(1).filter(x => /^\d{4}-\d{2}-\d{2}/.test(x[iD] || '') && isFinite(parseFloat(x[iCost])));
+      if (!lines.length) throw 0;
+      SHF.imp = { names, lines: lines.map(x => ({ d: x[iD].slice(0, 10), desc: (x[iDesc] || '').trim(), cat: (x[iCat] || '').trim(), cost: r2(parseFloat(x[iCost])), cur: x[iCur], n: [parseFloat(x[iCur + 1]) || 0, parseFloat(x[iCur + 2]) || 0] })) };
+      render();
+    } catch (e) { toast('Este ficheiro não parece uma exportação do Splitwise (CSV).'); }
+  };
+  r.readAsText(file);
+}
+function shImpWho(i) {
+  const im = SHF.imp, me = shMe(), o = shOther().email, email = j => j === i ? me : o, items = [];
+  im.lines.forEach((l, n) => {
+    const payer = l.n[0] > 0.004 ? 0 : l.n[1] > 0.004 ? 1 : -1; if (payer < 0 || !(l.cost > 0)) return;
+    const other = 1 - payer, id = 'sw-' + l.d + '-' + n + '-' + Math.round(l.cost * 100);
+    const base = { id, d: l.d, v: l.cost, pb: email(payer), imp: true, by: me, at: Date.now() };
+    if (/^payment$/i.test(l.cat)) items.push({ ...base, k: 'acerto', desc: 'Acerto de contas', sh: { [email(other)]: l.cost } });
+    else items.push({ ...base, k: 'gasto', desc: l.desc, c: l.cat, sh: { [email(payer)]: r2(l.cost - l.n[payer]), [email(other)]: r2(-l.n[other]) } });
+  });
+  const ds = items.map(x => x.d).sort(), mine = i;
+  const bal = r2(im.lines.reduce((a, l) => a + l.n[mine], 0));
+  const have = new Set((SH.items || []).map(x => x.id));
+  Object.assign(im, { who: true, items, from: ds[0], to: ds[ds.length - 1], bal, dup: items.filter(x => have.has(x.id)).length });
+  render();
+}
+let shTaps = [];
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, v = b.dataset.v, api = shApi();
+  if (act === 'sh-secret') {
+    const now = Date.now(); shTaps = shTaps.filter(t => now - t < 3000).concat([now]);
+    if (shTaps.length < 5 || !api) return; shTaps = [];
+    const on = !(S.settings.shared && S.settings.shared.on);
+    S.settings.shared = { ...(S.settings.shared || {}), on, from: (S.settings.shared && S.settings.shared.from) || today() };
+    saveSettings();
+    if (on) { api.start(); toast('Separador Partilhado ativado'); go('partilhado'); } else { toast('Separador Partilhado escondido'); render(); }
+    return;
+  }
+  if (!act.startsWith('sh-') || !api) return;
+  if (act === 'sh-login') api.signIn((S.settings.name || '').trim());
+  else if (act === 'sh-logout') { api.signOut(); shResetForm(); }
+  else if (act === 'sh-refresh') api.refresh();
+  else if (act === 'sh-payer') { SHF.payer = v; render(); }
+  else if (act === 'sh-split') { SHF.split = v; render(); if (v === 'pct') { const el = document.getElementById('sh-pct'); if (el) el.focus(); } }
+  else if (act === 'sh-cat') { SHF.cat = SHF.cat === v ? '' : v; render(); }
+  else if (act === 'sh-more') { SHF.more = true; render(); }
+  else if (act === 'sh-edit') { const x = (SH && SH.items || []).find(i => i.id === v); if (!x) { toast('Esta despesa partilhada já não existe.'); return; } if (x.k === 'acerto') { toast(`Acerto de ${eur(x.v)} de ${dayShort(x.d)}`, { label: 'Apagar', fn: () => api.put({ ...x, del: true, at: Date.now(), by: shMe() }) }); return; } shLoad(x); if (view !== 'partilhado') go('partilhado'); else { render(); window.scrollTo(0, 0); } }
+  else if (act === 'sh-cancel') { shResetForm(); render(); }
+  else if (act === 'sh-del') {
+    if (!SHF.confirmDel) { SHF.confirmDel = true; render(); return; }
+    const x = SH.items.find(i => i.id === SHF.editing); shResetForm(); if (!x) { render(); return; }
+    api.put({ ...x, del: true, at: Date.now(), by: shMe() });
+    toast('Despesa partilhada apagada', { label: 'Desfazer', fn: () => api.put({ ...x, del: false, at: Date.now(), by: shMe() }) });
+  }
+  else if (act === 'sh-settle') { SHF.settle = true; SHF.settleV = String(Math.abs(shBalance())).replace('.', ','); render(); const el = document.getElementById('sh-settle-v'); if (el) el.focus(); }
+  else if (act === 'sh-settle-cancel') { SHF.settle = false; render(); }
+  else if (act === 'sh-mine') { S.settings.shared = { ...S.settings.shared, mine: S.settings.shared.mine === false }; saveSettings(); shReconcile(); render(); }
+  else if (act === 'sh-imp-who') shImpWho(+v);
+  else if (act === 'sh-imp-cancel') { SHF.imp = null; render(); }
+  else if (act === 'sh-imp-ok') { const n = SHF.imp.items.length; api.putMany(SHF.imp.items); SHF.imp = null; render(); toast(`${n} movimentos do Splitwise importados`); }
+});
+app.addEventListener('input', e => {
+  const id = e.target.id; if (!id.startsWith('sh-')) return;
+  if (id === 'sh-amount' || id === 'sh-pct') {
+    SHF[id === 'sh-amount' ? 'amount' : 'pct'] = e.target.value;
+    const v = parseAmount(SHF.amount), shs = v > 0 && shOther() ? shShares(v) : null, res = document.getElementById('sh-res'), btn = document.querySelector('#sh-entry button[type=submit]');
+    if (res) res.innerHTML = shs ? `A minha parte: <b>${eur(shs[shMe()])}</b> · ${esc(shOther().name)}: <b>${eur(shs[shOther().email])}</b>` : 'Escreva o valor total.';
+    if (btn) { btn.disabled = !(shs && SHF.cat); if (!SHF.editing) btn.textContent = 'Guardar' + (v > 0 ? ' ' + eur(v) : ''); }
+  }
+  else if (id === 'sh-desc') SHF.desc = e.target.value;
+  else if (id === 'sh-settle-v') SHF.settleV = e.target.value;
+});
+app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'sh-date' && t.value) SHF.date = t.value;
+  else if (t.id === 'sh-defcat') { S.settings.shared = { ...S.settings.shared, cat: t.value }; saveSettings(); shReconcile(); }
+  else if (t.id === 'sh-csv' && t.files && t.files[0]) shReadCsv(t.files[0]);
+});
+app.addEventListener('submit', e => {
+  const f = e.target, api = shApi(); if (!api || !f.id.startsWith('sh-')) return;
+  const me = shMe(), o = shOther(); if (!o) return;
+  if (f.id === 'sh-entry') {
+    const v = parseAmount(SHF.amount), shs = v > 0 ? shShares(v) : null;
+    if (!shs) { toast('Verifique o valor e a percentagem (entre 0 e 100).'); return; }
+    if (!SHF.cat) { toast('Escolha uma categoria.'); return; }
+    const old = SHF.editing ? SH.items.find(i => i.id === SHF.editing) : null;
+    const item = { id: old ? old.id : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), k: 'gasto', d: SHF.date || today(), v, desc: SHF.desc.trim(), c: SHF.cat, pb: SHF.payer === 'me' ? me : o.email, sh: shs, by: me, at: Date.now() };
+    if (old && old.imp) item.imp = true;
+    api.put(item); shResetForm(); render();
+    toast(old ? 'Alterações guardadas' : `Guardado: ${item.desc || item.c} ${eur(v)} · a tua parte ${eur(shs[me])}`);
+  } else if (f.id === 'sh-settle') {
+    const v = parseAmount(SHF.settleV), bal = shBalance();
+    if (!(v > 0)) { toast('Escreva o valor do acerto.'); return; }
+    const from = bal > 0 ? o.email : me, to = bal > 0 ? me : o.email;
+    api.put({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), k: 'acerto', d: today(), v, desc: 'Acerto de contas', pb: from, sh: { [to]: v }, by: me, at: Date.now() });
+    SHF.settle = false; render(); toast('Acerto registado');
+  }
+});
+
 function recordHistory() {
   const total = S.accounts.accounts.reduce((s, a) => s + (+a.balance || 0), 0), d = today();
   S.accounts.history = (S.accounts.history || []).filter(h => h.d !== d).concat([{ d, total }]);
@@ -2034,6 +2299,10 @@ renderTabs();
       const was = SYNC; SYNC = i;
       if (!was || was.status !== i.status || was.on !== i.on || was.lastSync !== i.lastSync) render();
     });
+    if (db && window.LDC.shared) window.LDC.shared.onChange(i => {
+      SH = i; const sig = JSON.stringify([i.status, i.email, i.items, i.members, i.pending, i.error]);
+      if (sig === shSig) return; shSig = sig; shReconcile(); render();
+    });
   } else {
     const c = window.claude;
     const downloads = c && c.use ? await c.use('downloads').catch(() => null) : null;
@@ -2051,7 +2320,7 @@ renderTabs();
   db.collection('tx').onSnapshot(snap => {
     const m = {}; snap.docs.forEach(d => { m[d.id] = ((d.data() || {}).items || []).slice(); });
     const s = JSON.stringify(m); if (s === sig.tx && S.loaded.tx) return; sig.tx = s;
-    S.months = m; S.loaded.tx = true; render(); runAuto();
+    S.months = m; S.loaded.tx = true; render(); runAuto(); shReconcile();
   }, err);
   const watch = (id, apply) => db.doc('config/' + id).onSnapshot(d => {
     const data = d.exists ? d.data() : null; const s = JSON.stringify(data); if (s === sig[id] && S.loaded[id]) return; sig[id] = s;
