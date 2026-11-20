@@ -19,7 +19,11 @@ import com.google.android.gms.auth.api.identity.AuthorizationResult;
 import com.google.android.gms.auth.api.identity.Identity;
 import com.google.android.gms.common.api.Scope;
 
+import com.getcapacitor.JSArray;
+
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Asks Google for permission to keep the app's data in the person's Google Drive
@@ -39,17 +43,22 @@ public class DriveAuthPlugin extends Plugin {
             new ActivityResultContracts.StartIntentSenderForResult(), this::onConsent);
     }
 
-    private AuthorizationRequest request() {
-        return AuthorizationRequest.builder()
-            .setRequestedScopes(Collections.singletonList(new Scope(SCOPE)))
-            .build();
+    // Default: the Drive app folder. The shared expenses ask for the email instead (scopes option).
+    private AuthorizationRequest request(PluginCall call) {
+        List<Scope> scopes = new ArrayList<>();
+        JSArray list = call.getArray("scopes");
+        if (list != null) {
+            try { for (Object o : list.toList()) scopes.add(new Scope(String.valueOf(o))); } catch (Exception ignored) { }
+        }
+        if (scopes.isEmpty()) scopes = Collections.singletonList(new Scope(SCOPE));
+        return AuthorizationRequest.builder().setRequestedScopes(scopes).build();
     }
 
     @PluginMethod
     public void authorize(PluginCall call) {
         boolean interactive = Boolean.TRUE.equals(call.getBoolean("interactive", false));
         Activity activity = getActivity();
-        Identity.getAuthorizationClient(activity).authorize(request())
+        Identity.getAuthorizationClient(activity).authorize(request(call))
             .addOnSuccessListener(result -> {
                 if (!result.hasResolution()) { resolve(call, result); return; }
                 if (!interactive || result.getPendingIntent() == null) { call.reject("Login needed", "login"); return; }

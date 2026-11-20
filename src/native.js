@@ -9,6 +9,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import seed from '../seed/default.json';
 import { createSync } from './sync.js';
+import { createShared } from './shared.js';
 
 const PREFIX = 'ldc:';
 const docs = new Map();          // path -> data
@@ -77,6 +78,16 @@ const sync = createSync({
   },
 });
 
+// Shared expenses (only for people allowed by the Firestore rules); started by the page when switched on.
+const shared = createShared({
+  native: Capacitor.isNativePlatform(),
+  store: {
+    get: async (key) => (await Preferences.get({ key })).value,
+    set: (key, value) => Preferences.set({ key, value }),
+    remove: (key) => Preferences.remove({ key }),
+  },
+});
+
 const db = {
   doc(path) {
     return {
@@ -127,4 +138,4 @@ async function saveFile(filename, data, mime) {
   await Share.share({ title: filename, files: [uri], dialogTitle: 'Guardar ou enviar' });
 }
 
-window.LDC = { openDb, saveFile, sync, platform: Capacitor.isNativePlatform() ? 'android' : 'web' };
+window.LDC = { openDb, saveFile, sync, shared, platform: Capacitor.isNativePlatform() ? 'android' : 'web' };
