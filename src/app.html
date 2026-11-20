@@ -242,6 +242,9 @@ tr.sub > td { padding: 0 0 8px 1.2em; }
   #toast { left: calc(50% + 116px); bottom: 28px; }
 }
 @media (prefers-reduced-motion: no-preference) { .chip, .btn, .seg button { transition: background-color .15s, color .15s; } }
+#manual-ov { position: fixed; inset: 0; z-index: 100; background: var(--bg, #fff); display: flex; flex-direction: column; padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); }
+#manual-ov .mbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line, #e5e7eb); }
+#manual-ov iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 </style>
 
 <div class="wrap" id="app" aria-live="polite">
@@ -1219,6 +1222,7 @@ function viewAjustes() {
   return `
   <header class="top"><h1>Ajustes</h1><button class="btn ghost small" data-act="goto" data-v="inicio">‹ Início</button></header>
   <div class="stack">
+    <section class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin:0">📖 Manual</h2><p class="small muted" style="margin:4px 0 0">Como usar a app, passo a passo, com exemplos.</p></div>${host.kind === 'app' ? '<button class="btn small" data-act="manual-open">Abrir o manual</button>' : `<a class="btn small" href="${MANUAL_URL}" target="_blank" rel="noopener">Abrir o manual</a>`}</section>
     <form class="card stack" id="cat-add" autocomplete="off"><h2>Nova categoria</h2>
       <div class="row2"><div class="field"><label class="small" for="nc-name">Nome</label><input id="nc-name" placeholder="ex.: Animais"></div>
       <div class="field"><label class="small" for="nc-type">Tipo</label><select id="nc-type">${TYPES.map(t => `<option ${UI.addCatType === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
@@ -1366,6 +1370,23 @@ function renderTabs() {
   const btn = ([k, l], cls) => `<button type="button" data-tab="${k}" ${cls ? `class="${cls}"` : ''} ${view === k ? 'aria-current="page"' : ''}>${ICONS[k]}<span>${l}</span></button>`;
   document.getElementById('tabs').innerHTML = '<div class="brand desk">Livro de Contas</div>' + (shOn() ? [...TABS, ['partilhado', 'Partilhado']] : TABS).map(t => btn(t)).join('') + btn(['procurar', 'Procurar'], 'desk') + btn(['ajustes', 'Ajustes'], 'desk');
 }
+// The manual (manual.html, built from the guide) opens over the app; Android's back button closes it.
+const MANUAL_URL = 'https://luisdiogo97.github.io/Livro-de-contas/manual.html';
+function openManual() {
+  if (document.getElementById('manual-ov')) return;
+  const d = document.createElement('div');
+  d.id = 'manual-ov'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Manual');
+  d.innerHTML = '<div class="mbar"><button class="btn ghost small" data-act="manual-close">‹ Voltar</button><b>Manual</b><span></span></div><iframe src="manual.html" title="Manual do Livro de Contas"></iframe>';
+  d.addEventListener('click', e => { if (e.target.closest('[data-act="manual-close"]')) closeManual(false); });
+  document.body.appendChild(d);
+  try { history.pushState({ manual: 1 }, ''); } catch (e) {}
+}
+function closeManual(fromPop) {
+  const d = document.getElementById('manual-ov'); if (!d) return;
+  d.remove();
+  if (!fromPop) try { history.back(); } catch (e) {}
+}
+window.addEventListener('popstate', () => closeManual(true));
 function render() {
   if (!S.loaded.tx || !S.loaded.categories) { renderTabs(); return; }
   refreshMain();
@@ -1444,6 +1465,7 @@ app.addEventListener('click', e => {
   else if (act === 'cat-del' && allTx().some(x => x.c === S.cats[+b.dataset.i]?.name)) { const i = +b.dataset.i; UI.catMove = UI.catMove === i ? null : i; render(); const el = document.getElementById('cm-to-' + i); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
   else if (act === 'cat-del') { const i = +b.dataset.i; const c = S.cats[i]; UI.catMove = null; S.cats.splice(i, 1); saveCats(); render(); toast(`Categoria removida: ${c.name}`, { label: 'Desfazer', fn: () => { S.cats.splice(i, 0, c); saveCats(); render(); } }); }
   else if (act === 'export') exportXlsx();
+  else if (act === 'manual-open') openManual();
   else if (act === 'backup') doBackup();
   else if (act === 'sync-on') window.LDC.sync.connect();
   else if (act === 'sync-now') window.LDC.sync.syncNow();
