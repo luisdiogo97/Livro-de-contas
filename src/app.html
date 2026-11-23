@@ -939,6 +939,18 @@ function viewAno() {
   const spendCats = Object.entries(byCat).filter(([c]) => SPEND.includes(catType(c))).sort((a, b) => b[1] - a[1]);
   const incCats = Object.entries(byCat).filter(([c]) => catType(c) === 'Receita').sort((a, b) => b[1] - a[1]);
   const maxCat = spendCats[0] ? spendCats[0][1] : 1;
+  // Tap a category to see its movements in the period, newest first, with a subtotal per month.
+  const catTxRow = (c, cols) => {
+    if (UI.catOpen !== c) return '';
+    const xs = items.filter(x => x.c === c).sort((a, b) => b.d.localeCompare(a.d));
+    let html = '', cur = '';
+    for (const x of xs) {
+      const k = monthKey(x.d);
+      if (k !== cur) { cur = k; const sub = xs.filter(y => monthKey(y.d) === k).reduce((a, y) => a + y.v, 0); html += `<div class="small muted" style="display:flex;justify-content:space-between;padding:10px 4px 2px;text-transform:capitalize"><b>${esc(monthShort(k))}</b><span class="num">${eur(sub)}</span></div>`; }
+      html += rowTx(x);
+    }
+    return `<tr class="sub"><td colspan="${cols}"><div class="list">${html}</div></td></tr>`;
+  };
   // 50/30/20
   let need = 0, want = 0; for (const x of items) { if (!SPEND.includes(catType(x.c))) continue; const n = (S.cats.find(c => c.name === x.c) || {}).nature; if (n === 'Desejo') want += x.v; else need += x.v; }
   const rule = [['Necessidades', need, 0.5], ['Desejos', want, 0.3], ['Poupança', tot.Receita - need - want, 0.2]];
@@ -989,11 +1001,11 @@ function viewAno() {
     <div class="grid2">
       <section class="card"><h2>Gastos por categoria</h2><div class="tbl-wrap"><table>
         <thead><tr><th>Categoria</th><th class="r">Total</th><th class="r">Média/mês</th><th class="r">%</th></tr></thead>
-        <tbody>${spendCats.map(([c, v]) => `<tr><td>${esc(c)}<div class="bar" style="width:${(v / maxCat * 100).toFixed(1)}%"></div></td><td class="r">${eur0(v)}</td><td class="r">${eur0(v / withData)}</td><td class="r">${pct(v / tot.gastos)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Sem gastos no período.</td></tr>'}</tbody></table></div></section>
+        <tbody>${spendCats.map(([c, v]) => `<tr class="click" data-act="cat-open" data-v="${esc(c)}" aria-expanded="${UI.catOpen === c}"><td><span class="chev">${UI.catOpen === c ? '▾' : '▸'}</span> ${esc(c)}<div class="bar" style="width:${(v / maxCat * 100).toFixed(1)}%"></div></td><td class="r">${eur0(v)}</td><td class="r">${eur0(v / withData)}</td><td class="r">${pct(v / tot.gastos)}</td></tr>${catTxRow(c, 4)}`).join('') || '<tr><td colspan="4" class="muted">Sem gastos no período.</td></tr>'}</tbody></table></div></section>
       <div class="stack">
         <section class="card chart"><h2>Despesas variáveis por dia da semana</h2>
           ${barChart({ labels: WEEK, series: [{ color: 'var(--s1)', values: wd }], tips: WEEK.map((w, i) => `${w}: ${eur(wd[i])} em ${wn[i]} movimentos\nMédia: ${eur(wn[i] ? wd[i] / wn[i] : 0)}`), h: 170 })}</section>
-        <section class="card"><h2>Receitas por origem</h2><div class="tbl-wrap"><table><tbody>${incCats.map(([c, v]) => `<tr><td>${esc(c)}</td><td class="r">${eur0(v)}</td><td class="r muted">${eur0(v / withData)}/mês</td></tr>`).join('') || '<tr><td class="muted">Sem receitas no período.</td></tr>'}</tbody></table></div>
+        <section class="card"><h2>Receitas por origem</h2><div class="tbl-wrap"><table><tbody>${incCats.map(([c, v]) => `<tr class="click" data-act="cat-open" data-v="${esc(c)}" aria-expanded="${UI.catOpen === c}"><td><span class="chev">${UI.catOpen === c ? '▾' : '▸'}</span> ${esc(c)}</td><td class="r">${eur0(v)}</td><td class="r muted">${eur0(v / withData)}/mês</td></tr>${catTxRow(c, 3)}`).join('') || '<tr><td class="muted">Sem receitas no período.</td></tr>'}</tbody></table></div>
           ${big ? `<p class="small muted" style="margin-top:12px">Maior despesa: <b>${eur(big.v)}</b> em ${esc(big.c)}, ${esc(dayShort(big.d))}${big.n ? ' (' + esc(big.n) + ')' : ''}.</p>` : ''}</section>
       </div>
     </div>
