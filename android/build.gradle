@@ -4,6 +4,8 @@ buildscript {
     
     repositories {
         google()
+        // Google's mirror of Maven Central first: Maven Central often answers GitHub runners with 429.
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
         mavenCentral()
     }
     dependencies {
@@ -20,6 +22,8 @@ apply from: "variables.gradle"
 allprojects {
     repositories {
         google()
+        // Google's mirror of Maven Central first: Maven Central often answers GitHub runners with 429.
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
         mavenCentral()
     }
 }
