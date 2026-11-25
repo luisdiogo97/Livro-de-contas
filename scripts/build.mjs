@@ -42,6 +42,7 @@ ${fontCss}
 body { margin: 0; overscroll-behavior-y: none; }
 [hidden] { display: none !important; }
 </style>
+<script>window.LDC_VERSION = ${JSON.stringify(process.env.LDC_VERSION || '')}; window.LDC_BUILD_DATE = ${JSON.stringify(new Date().toISOString().slice(0, 10))};</script>
 <script src="native.js"></script>
 </head>
 <body>
