@@ -29,6 +29,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle
 
       # The Ubuntu 24.04 runner image ships the Android SDK; just accept its licences.
       - name: Android SDK
@@ -37,6 +38,8 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Build web app
+        env:
+          LDC_VERSION: 1.${{ github.run_number }}
         run: |
           npm ci
           npm run build

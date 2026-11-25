@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -29,6 +30,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Same version number as the Android release built from this commit.
+      - name: Version number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh api "repos/${{ github.repository }}/actions/workflows/android.yml/runs?head_sha=${{ github.sha }}&per_page=1" --jq '.workflow_runs[0].run_number // empty' || true)
+          echo "LDC_VERSION=${n:+1.$n}" >> "$GITHUB_ENV"
       - run: |
           npm ci
           npm run build

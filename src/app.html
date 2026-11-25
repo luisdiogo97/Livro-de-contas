@@ -1251,7 +1251,14 @@ function viewAjustes() {
       ${syncCard()}
       ${backupCard()}
     </div>
+    ${appVersion()}
   </div>`;
+}
+// Set by scripts/build.mjs from the release number (1.<run>); absent on the claude.ai page.
+function appVersion() {
+  const v = window.LDC_VERSION, d = window.LDC_BUILD_DATE;
+  if (host.kind !== 'app' || (!v && !d)) return '';
+  return `<p class="small muted" style="text-align:center;margin:8px 0 4px">Livro de Contas · ${v ? 'versão ' + esc(v) : 'versão de ' + esc(d.split('-').reverse().join('/'))}${v && d ? ' · ' + esc(d.split('-').reverse().join('/')) : ''}</p>`;
 }
 
 function restoreBlock() {
